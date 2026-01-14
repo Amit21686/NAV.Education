@@ -2,7 +2,6 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-
 <meta name="viewport"
   content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
 
@@ -13,11 +12,12 @@
     margin: 0;
     background: #0a0a14;
     overflow: hidden;
-    touch-action: pan-x pan-y pinch-zoom;
     user-select: none;
+    font-family: system-ui, -apple-system;
   }
 
   #viewer {
+    position: relative;
     width: 100vw;
     height: 100vh;
     overflow: auto;
@@ -27,25 +27,73 @@
   }
 
   canvas {
-    background: white;
+    background: #ffffff;
     max-width: 100%;
     height: auto;
   }
 
   .highlight {
     position: absolute;
-    background: rgba(255, 255, 0, 0.35);
     border-radius: 4px;
   }
 
-  .note {
-    position: absolute;
+  /* COLOR PICKER */
+  #colorPicker {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    gap: 12px;
+    z-index: 20;
+  }
+
+  .color {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+  }
+
+  /* NOTE SHEET */
+  #noteSheet {
+    position: fixed;
+    bottom: -100%;
+    left: 0;
+    width: 100%;
     background: #111827;
+    border-radius: 20px 20px 0 0;
+    padding: 16px;
+    transition: bottom 0.25s ease;
+    z-index: 30;
+  }
+
+  #noteSheet h3 {
+    margin: 0 0 10px;
     color: #fff;
-    padding: 6px 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    max-width: 160px;
+    font-size: 16px;
+  }
+
+  textarea {
+    width: 100%;
+    height: 80px;
+    border-radius: 12px;
+    border: none;
+    padding: 10px;
+    font-size: 14px;
+    resize: none;
+  }
+
+  #saveNote {
+    margin-top: 12px;
+    background: #7c4dff;
+    color: #fff;
+    border: none;
+    width: 100%;
+    padding: 12px;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 600;
   }
 </style>
 </head>
@@ -54,121 +102,210 @@
 
 <div id="viewer"></div>
 
+<div id="colorPicker">
+  <div class="color" style="background:#facc15" data-color="rgba(250,204,21,0.4)"></div>
+  <div class="color" style="background:#4ade80" data-color="rgba(74,222,128,0.4)"></div>
+  <div class="color" style="background:#60a5fa" data-color="rgba(96,165,250,0.4)"></div>
+  <div class="color" style="background:#f472b6" data-color="rgba(244,114,182,0.4)"></div>
+</div>
+
+<div id="noteSheet">
+  <h3>Note</h3>
+  <textarea placeholder="Write your note..."></textarea>
+  <button id="saveNote">Save</button>
+</div>
+
 <script>
   const params = new URLSearchParams(location.search);
   const pdfUrl = params.get("file");
-  const storageKey = "pdf_annotations_" + pdfUrl;
+  const storeKey = "annotations_" + pdfUrl;
 
   let pdfDoc = null;
   let pageNum = 1;
   let scale = 1.4;
-  let startX = 0;
+
+  let annotationMode = false;
   let pressTimer = null;
-  let isLongPress = false;
+  let deleteTimer = null;
+  let startX = 0, startY = 0;
+  let currentColor = "rgba(250,204,21,0.4)";
+  let activeHighlight = null;
+  let activeDataRef = null;
+  let lastTap = 0;
 
   const viewer = document.getElementById("viewer");
+  const picker = document.getElementById("colorPicker");
+  const sheet = document.getElementById("noteSheet");
+  const textarea = sheet.querySelector("textarea");
 
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-  /* ---------- LOAD PDF (OFFLINE CACHE) ---------- */
-  pdfjsLib.getDocument({
-    url: pdfUrl,
-    disableStream: false,
-    disableAutoFetch: false
-  }).promise.then(pdf => {
+  pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
     pdfDoc = pdf;
-    renderPage(pageNum);
-    loadAnnotations();
+    renderPage();
+    loadHighlights();
   });
 
-  function renderPage(num) {
-    pdfDoc.getPage(num).then(page => {
-      viewer.innerHTML = "";
-
+  function renderPage() {
+    viewer.innerHTML = "";
+    pdfDoc.getPage(pageNum).then(page => {
       const viewport = page.getViewport({ scale });
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
 
       canvas.width = viewport.width;
       canvas.height = viewport.height;
-
       viewer.appendChild(canvas);
 
-      page.render({
-        canvasContext: ctx,
-        viewport
-      });
+      page.render({ canvasContext: ctx, viewport });
     });
   }
 
-  /* ---------- SWIPE PAGE ---------- */
+  /* ---------- TOUCH HANDLERS ---------- */
+
   viewer.addEventListener("touchstart", e => {
+
+    if (e.touches.length > 1) return; // pinch zoom allowed
+
     startX = e.touches[0].clientX;
-    isLongPress = false;
+    startY = e.touches[0].clientY;
 
     pressTimer = setTimeout(() => {
-      isLongPress = true;
+      annotationMode = true;
+      picker.style.display = "flex";
     }, 600);
   });
 
-  viewer.addEventListener("touchend", e => {
+  viewer.addEventListener("touchmove", e => {
+
+    if (!annotationMode || e.touches.length > 1) return;
+
+    const x = e.touches[0].clientX;
+    const y = e.touches[0].clientY;
+
+    const dx = Math.abs(x - startX);
+    const dy = Math.abs(y - startY);
+
+    if (dx < 12 && dy < 12) return;
+
+    if (!activeHighlight) {
+      activeHighlight = document.createElement("div");
+      activeHighlight.className = "highlight";
+      activeHighlight.style.background = currentColor;
+      viewer.appendChild(activeHighlight);
+    }
+
+    Object.assign(activeHighlight.style, {
+      left: Math.min(startX, x) + "px",
+      top: Math.min(startY, y) + "px",
+      width: Math.abs(x - startX) + "px",
+      height: Math.abs(y - startY) + "px"
+    });
+
+    e.preventDefault();
+  }, { passive: false });
+
+  viewer.addEventListener("touchend", () => {
     clearTimeout(pressTimer);
 
-    const endX = e.changedTouches[0].clientX;
-    const diff = startX - endX;
-
-    if (!isLongPress && Math.abs(diff) > 80) {
-      if (diff > 0 && pageNum < pdfDoc.numPages) {
-        pageNum++;
-        renderPage(pageNum);
-        loadAnnotations();
-      }
-      if (diff < 0 && pageNum > 1) {
-        pageNum--;
-        renderPage(pageNum);
-        loadAnnotations();
-      }
+    if (activeHighlight) {
+      saveHighlight({
+        page: pageNum,
+        x: activeHighlight.style.left,
+        y: activeHighlight.style.top,
+        w: activeHighlight.style.width,
+        h: activeHighlight.style.height,
+        color: currentColor,
+        note: ""
+      });
+      activeHighlight = null;
     }
+
+    const now = Date.now();
+    if (now - lastTap < 300 && annotationMode) {
+      annotationMode = false;
+      picker.style.display = "none";
+    }
+    if (now - lastTap < 300 && !annotationMode) {
+      scale = 1.4;
+      renderPage();
+      loadHighlights();
+    }
+    lastTap = now;
   });
 
-  /* ---------- LONG PRESS = ADD NOTE ---------- */
-  viewer.addEventListener("touchstart", e => {
-    pressTimer = setTimeout(() => {
-      const text = prompt("Add note:");
-      if (!text) return;
+  /* ---------- STORAGE ---------- */
 
-      const rect = {
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY,
-        text,
-        page: pageNum
-      };
+  function saveHighlight(h) {
+    const data = JSON.parse(localStorage.getItem(storeKey) || "[]");
+    data.push(h);
+    localStorage.setItem(storeKey, JSON.stringify(data));
+    loadHighlights();
+  }
 
-      saveAnnotation(rect);
-      showNote(rect);
-    }, 700);
+  function loadHighlights() {
+    viewer.querySelectorAll(".highlight").forEach(h => h.remove());
+
+    const data = JSON.parse(localStorage.getItem(storeKey) || "[]");
+
+    data.filter(h => h.page === pageNum).forEach((h, index) => {
+      const d = document.createElement("div");
+      d.className = "highlight";
+      Object.assign(d.style, {
+        left: h.x,
+        top: h.y,
+        width: h.w,
+        height: h.h,
+        background: h.color
+      });
+
+      d.addEventListener("click", e => {
+        e.stopPropagation();
+        if (!annotationMode) openNote(h, index);
+      });
+
+      d.addEventListener("touchstart", e => {
+        if (!annotationMode) return;
+        e.stopPropagation();
+        deleteTimer = setTimeout(() => {
+          deleteHighlight(index);
+        }, 600);
+      });
+
+      d.addEventListener("touchend", () => clearTimeout(deleteTimer));
+
+      viewer.appendChild(d);
+    });
+  }
+
+  function deleteHighlight(index) {
+    const data = JSON.parse(localStorage.getItem(storeKey) || "[]");
+    data.splice(index, 1);
+    localStorage.setItem(storeKey, JSON.stringify(data));
+    loadHighlights();
+  }
+
+  /* ---------- NOTES ---------- */
+
+  function openNote(h, index) {
+    activeDataRef = index;
+    textarea.value = h.note || "";
+    sheet.style.bottom = "0";
+  }
+
+  document.getElementById("saveNote").onclick = () => {
+    const data = JSON.parse(localStorage.getItem(storeKey) || "[]");
+    if (activeDataRef !== null) {
+      data[activeDataRef].note = textarea.value;
+      localStorage.setItem(storeKey, JSON.stringify(data));
+    }
+    sheet.style.bottom = "-100%";
+  };
+
+  picker.querySelectorAll(".color").forEach(c => {
+    c.onclick = () => currentColor = c.dataset.color;
   });
-
-  function saveAnnotation(note) {
-    const data = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    data.push(note);
-    localStorage.setItem(storageKey, JSON.stringify(data));
-  }
-
-  function loadAnnotations() {
-    const data = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    data.filter(n => n.page === pageNum).forEach(showNote);
-  }
-
-  function showNote(note) {
-    const div = document.createElement("div");
-    div.className = "note";
-    div.style.left = note.x + "px";
-    div.style.top = note.y + "px";
-    div.innerText = note.text;
-    viewer.appendChild(div);
-  }
 </script>
 
 </body>
