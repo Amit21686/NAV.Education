@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PDF Viewer</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      background: #0a0a14;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: #111827;
+      border-bottom: 1px solid #1f2933;
+    }
+
+    button {
+      background: #1f2937;
+      color: #ffffff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    button:active {
+      background: #374151;
+    }
+
+    #page-info {
+      margin-left: auto;
+      font-size: 13px;
+      opacity: 0.8;
+    }
+
+    #viewer {
+      overflow: auto;
+      height: calc(100vh - 52px);
+      padding: 10px;
+    }
+
+    canvas {
+      display: block;
+      margin: 0 auto 20px auto;
+      background: #ffffff;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOOLBAR -->
+  <div id="toolbar">
+    <button onclick="zoomOut()">−</button>
+    <button onclick="zoomIn()">+</button>
+    <button onclick="prevPage()">◀</button>
+    <button onclick="nextPage()">▶</button>
+    <div id="page-info">Page 1</div>
+  </div>
+
+  <!-- PDF VIEW -->
+  <div id="viewer"></div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const pdfUrl = urlParams.get("file");
+
+    if (!pdfUrl) {
+      document.body.innerHTML = "<p style='padding:20px'>No PDF provided</p>";
+      throw new Error("PDF URL missing");
+    }
+
+    let pdfDoc = null;
+    let pageNum = 1;
+    let scale = 1.2;
+    const viewer = document.getElementById("viewer");
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+    pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
+      pdfDoc = pdf;
+      renderPage(pageNum);
+    });
+
+    function renderPage(num) {
+      pdfDoc.getPage(num).then(page => {
+        viewer.innerHTML = "";
+
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        viewer.appendChild(canvas);
+
+        page.render({
+          canvasContext: ctx,
+          viewport
+        });
+
+        document.getElementById("page-info").innerText =
+          `Page ${num} / ${pdfDoc.numPages}`;
+      });
+    }
+
+    function nextPage() {
+      if (pageNum < pdfDoc.numPages) {
+        pageNum++;
+        renderPage(pageNum);
+      }
+    }
+
+    function prevPage() {
+      if (pageNum > 1) {
+        pageNum--;
+        renderPage(pageNum);
+      }
+    }
+
+    function zoomIn() {
+      scale += 0.2;
+      renderPage(pageNum);
+    }
+
+    function zoomOut() {
+      if (scale > 0.6) {
+        scale -= 0.2;
+        renderPage(pageNum);
+      }
+    }
+  </script>
+
+</body>
+</html>
