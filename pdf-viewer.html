@@ -27,7 +27,7 @@
   }
 
   canvas {
-    background: #ffffff;
+    background: #fff;
     max-width: 100%;
     height: auto;
   }
@@ -37,7 +37,7 @@
     border-radius: 4px;
   }
 
-  /* COLOR PICKER */
+  /* Color Picker */
   #colorPicker {
     position: fixed;
     bottom: 20px;
@@ -55,7 +55,7 @@
     border: 2px solid #fff;
   }
 
-  /* NOTE SHEET */
+  /* Note Sheet */
   #noteSheet {
     position: fixed;
     bottom: -100%;
@@ -68,12 +68,6 @@
     z-index: 30;
   }
 
-  #noteSheet h3 {
-    margin: 0 0 10px;
-    color: #fff;
-    font-size: 16px;
-  }
-
   textarea {
     width: 100%;
     height: 80px;
@@ -81,7 +75,6 @@
     border: none;
     padding: 10px;
     font-size: 14px;
-    resize: none;
   }
 
   #saveNote {
@@ -110,7 +103,6 @@
 </div>
 
 <div id="noteSheet">
-  <h3>Note</h3>
   <textarea placeholder="Write your note..."></textarea>
   <button id="saveNote">Save</button>
 </div>
@@ -120,17 +112,14 @@
   const pdfUrl = params.get("file");
   const storeKey = "annotations_" + pdfUrl;
 
-  let pdfDoc = null;
-  let pageNum = 1;
-  let scale = 1.4;
+  let pdfDoc, pageNum = 1, scale = 1.4;
 
   let annotationMode = false;
-  let pressTimer = null;
-  let deleteTimer = null;
+  let longPressTimer = null;
   let startX = 0, startY = 0;
-  let currentColor = "rgba(250,204,21,0.4)";
+  let hasMoved = false;
   let activeHighlight = null;
-  let activeDataRef = null;
+  let currentColor = "rgba(250,204,21,0.4)";
   let lastTap = 0;
 
   const viewer = document.getElementById("viewer");
@@ -150,64 +139,65 @@
   function renderPage() {
     viewer.innerHTML = "";
     pdfDoc.getPage(pageNum).then(page => {
-      const viewport = page.getViewport({ scale });
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      viewer.appendChild(canvas);
-
-      page.render({ canvasContext: ctx, viewport });
+      const vp = page.getViewport({ scale });
+      const c = document.createElement("canvas");
+      c.width = vp.width;
+      c.height = vp.height;
+      viewer.appendChild(c);
+      page.render({ canvasContext: c.getContext("2d"), viewport: vp });
     });
   }
 
-  /* ---------- TOUCH HANDLERS ---------- */
+  /* STRICT TOUCH LOGIC */
 
   viewer.addEventListener("touchstart", e => {
-
-    if (e.touches.length > 1) return; // pinch zoom allowed
+    if (e.touches.length !== 1) return;
 
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
+    hasMoved = false;
 
-    pressTimer = setTimeout(() => {
-      annotationMode = true;
-      picker.style.display = "flex";
-    }, 600);
+    longPressTimer = setTimeout(() => {
+      if (!hasMoved) {
+        annotationMode = true;
+        picker.style.display = "flex";
+      }
+    }, 650);
   });
 
   viewer.addEventListener("touchmove", e => {
-
-    if (!annotationMode || e.touches.length > 1) return;
+    if (e.touches.length !== 1) return;
 
     const x = e.touches[0].clientX;
     const y = e.touches[0].clientY;
 
-    const dx = Math.abs(x - startX);
-    const dy = Math.abs(y - startY);
+    if (Math.abs(x - startX) > 6 || Math.abs(y - startY) > 6) {
+      hasMoved = true;
+      clearTimeout(longPressTimer);
+    }
 
-    if (dx < 12 && dy < 12) return;
+    if (!annotationMode) return;
 
-    if (!activeHighlight) {
+    if (!activeHighlight && Math.abs(x - startX) > 12) {
       activeHighlight = document.createElement("div");
       activeHighlight.className = "highlight";
       activeHighlight.style.background = currentColor;
       viewer.appendChild(activeHighlight);
     }
 
-    Object.assign(activeHighlight.style, {
-      left: Math.min(startX, x) + "px",
-      top: Math.min(startY, y) + "px",
-      width: Math.abs(x - startX) + "px",
-      height: Math.abs(y - startY) + "px"
-    });
-
-    e.preventDefault();
+    if (activeHighlight) {
+      Object.assign(activeHighlight.style, {
+        left: Math.min(startX, x) + "px",
+        top: Math.min(startY, y) + "px",
+        width: Math.abs(x - startX) + "px",
+        height: Math.abs(y - startY) + "px"
+      });
+      e.preventDefault();
+    }
   }, { passive: false });
 
   viewer.addEventListener("touchend", () => {
-    clearTimeout(pressTimer);
+    clearTimeout(longPressTimer);
 
     if (activeHighlight) {
       saveHighlight({
@@ -223,89 +213,50 @@
     }
 
     const now = Date.now();
-    if (now - lastTap < 300 && annotationMode) {
-      annotationMode = false;
-      picker.style.display = "none";
-    }
-    if (now - lastTap < 300 && !annotationMode) {
-      scale = 1.4;
-      renderPage();
-      loadHighlights();
+    if (now - lastTap < 300) {
+      if (annotationMode) {
+        annotationMode = false;
+        picker.style.display = "none";
+      } else {
+        scale = 1.4;
+        renderPage();
+        loadHighlights();
+      }
     }
     lastTap = now;
   });
 
-  /* ---------- STORAGE ---------- */
-
   function saveHighlight(h) {
-    const data = JSON.parse(localStorage.getItem(storeKey) || "[]");
-    data.push(h);
-    localStorage.setItem(storeKey, JSON.stringify(data));
+    const d = JSON.parse(localStorage.getItem(storeKey) || "[]");
+    d.push(h);
+    localStorage.setItem(storeKey, JSON.stringify(d));
     loadHighlights();
   }
 
   function loadHighlights() {
     viewer.querySelectorAll(".highlight").forEach(h => h.remove());
-
-    const data = JSON.parse(localStorage.getItem(storeKey) || "[]");
-
-    data.filter(h => h.page === pageNum).forEach((h, index) => {
-      const d = document.createElement("div");
-      d.className = "highlight";
-      Object.assign(d.style, {
-        left: h.x,
-        top: h.y,
-        width: h.w,
-        height: h.h,
-        background: h.color
-      });
-
-      d.addEventListener("click", e => {
-        e.stopPropagation();
-        if (!annotationMode) openNote(h, index);
-      });
-
-      d.addEventListener("touchstart", e => {
-        if (!annotationMode) return;
-        e.stopPropagation();
-        deleteTimer = setTimeout(() => {
-          deleteHighlight(index);
-        }, 600);
-      });
-
-      d.addEventListener("touchend", () => clearTimeout(deleteTimer));
-
-      viewer.appendChild(d);
+    const d = JSON.parse(localStorage.getItem(storeKey) || "[]");
+    d.filter(h => h.page === pageNum).forEach(h => {
+      const el = document.createElement("div");
+      el.className = "highlight";
+      Object.assign(el.style, h);
+      el.onclick = () => {
+        if (!annotationMode) {
+          textarea.value = h.note || "";
+          sheet.style.bottom = "0";
+        }
+      };
+      viewer.appendChild(el);
     });
   }
 
-  function deleteHighlight(index) {
-    const data = JSON.parse(localStorage.getItem(storeKey) || "[]");
-    data.splice(index, 1);
-    localStorage.setItem(storeKey, JSON.stringify(data));
-    loadHighlights();
-  }
-
-  /* ---------- NOTES ---------- */
-
-  function openNote(h, index) {
-    activeDataRef = index;
-    textarea.value = h.note || "";
-    sheet.style.bottom = "0";
-  }
+  picker.querySelectorAll(".color").forEach(c =>
+    c.onclick = () => currentColor = c.dataset.color
+  );
 
   document.getElementById("saveNote").onclick = () => {
-    const data = JSON.parse(localStorage.getItem(storeKey) || "[]");
-    if (activeDataRef !== null) {
-      data[activeDataRef].note = textarea.value;
-      localStorage.setItem(storeKey, JSON.stringify(data));
-    }
     sheet.style.bottom = "-100%";
   };
-
-  picker.querySelectorAll(".color").forEach(c => {
-    c.onclick = () => currentColor = c.dataset.color;
-  });
 </script>
 
 </body>
