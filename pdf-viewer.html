@@ -2,7 +2,6 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-
 <meta name="viewport"
   content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
 
@@ -22,72 +21,33 @@
     width: 100vw;
     height: 100vh;
     overflow: auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  }
+
+  .page {
+    margin: 12px auto;
+    background: #fff;
   }
 
   canvas {
-    background: #ffffff;
-    max-width: 100%;
-    height: auto;
+    display: block;
+    margin: 0 auto;
+    background: #fff;
   }
 
-  .highlight {
-    position: absolute;
-    border-radius: 4px;
-  }
-
-  /* COLOR PICKER */
-  #colorPicker {
+  /* MODE TOAST */
+  #modeToast {
     position: fixed;
-    bottom: 20px;
+    top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    display: none;
-    gap: 12px;
-    z-index: 20;
-  }
-
-  .color {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    border: 2px solid #fff;
-  }
-
-  /* NOTE SHEET */
-  #noteSheet {
-    position: fixed;
-    bottom: -100%;
-    left: 0;
-    width: 100%;
-    background: #111827;
-    border-radius: 20px 20px 0 0;
-    padding: 16px;
-    transition: bottom 0.25s ease;
-    z-index: 30;
-  }
-
-  textarea {
-    width: 100%;
-    height: 80px;
-    border-radius: 12px;
-    border: none;
-    padding: 10px;
-    font-size: 14px;
-  }
-
-  #saveNote {
-    margin-top: 12px;
-    background: #7c4dff;
+    background: rgba(0,0,0,0.7);
     color: #fff;
-    border: none;
-    width: 100%;
-    padding: 12px;
-    border-radius: 14px;
-    font-size: 15px;
-    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity .3s;
+    z-index: 50;
   }
 </style>
 </head>
@@ -95,255 +55,132 @@
 <body>
 
 <div id="viewer"></div>
-
-<div id="colorPicker">
-  <div class="color" style="background:#facc15" data-color="rgba(250,204,21,0.4)"></div>
-  <div class="color" style="background:#4ade80" data-color="rgba(74,222,128,0.4)"></div>
-  <div class="color" style="background:#60a5fa" data-color="rgba(96,165,250,0.4)"></div>
-  <div class="color" style="background:#f472b6" data-color="rgba(244,114,182,0.4)"></div>
-</div>
-
-<div id="noteSheet">
-  <textarea placeholder="Write your note..."></textarea>
-  <button id="saveNote">Save</button>
-</div>
+<div id="modeToast"></div>
 
 <script>
-  /* ---------------- STATE ---------------- */
-  const params = new URLSearchParams(location.search);
-  const pdfUrl = params.get("file");
-  const storeKey = "annotations_" + pdfUrl;
+/* ---------------- STATE ---------------- */
+const params = new URLSearchParams(location.search);
+const pdfUrl = params.get("file");
 
-  let pdfDoc = null;
-  let pageNum = 1;
-  let scale = 1.4;
+let pdfDoc = null;
+let pageNum = 1;
+let scale = 1.4;
+const BASE_SCALE = 1.4;
 
-  let annotationMode = false;
-  let readingMode = "vertical"; // vertical | horizontal
+let readingMode = "vertical"; // vertical | horizontal
+let lastTap = 0;
+let startX = 0;
 
-  let longPressTimer = null;
-  let deleteTimer = null;
+const viewer = document.getElementById("viewer");
+const toast = document.getElementById("modeToast");
 
-  let startX = 0, startY = 0;
-  let hasMoved = false;
-  let activeHighlight = null;
-  let currentColor = "rgba(250,204,21,0.4)";
-  let lastTap = 0;
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-  let twoFingerStartY = 0;
-  let twoFingerActive = false;
+/* ---------------- LOAD PDF ---------------- */
+pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
+  pdfDoc = pdf;
+  render();
+});
 
-  const viewer = document.getElementById("viewer");
-  const picker = document.getElementById("colorPicker");
-  const sheet = document.getElementById("noteSheet");
-  const textarea = sheet.querySelector("textarea");
+/* ---------------- RENDER ---------------- */
+function render() {
+  viewer.innerHTML = "";
+  if (readingMode === "vertical") renderVertical();
+  else renderHorizontal();
+}
 
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
-  /* ---------------- PDF LOAD ---------------- */
-  pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
-    pdfDoc = pdf;
-    renderPage();
-    loadHighlights();
-    applyReadingMode();
-  });
-
-  function renderPage() {
-    viewer.innerHTML = "";
-    pdfDoc.getPage(pageNum).then(page => {
+function renderVertical() {
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    pdfDoc.getPage(i).then(page => {
       const vp = page.getViewport({ scale });
-      const c = document.createElement("canvas");
-      c.width = vp.width;
-      c.height = vp.height;
-      viewer.appendChild(c);
-      page.render({ canvasContext: c.getContext("2d"), viewport: vp });
+      const canvas = document.createElement("canvas");
+      canvas.width = vp.width;
+      canvas.height = vp.height;
+      canvas.className = "page";
+      viewer.appendChild(canvas);
+      page.render({ canvasContext: canvas.getContext("2d"), viewport: vp });
     });
   }
+}
 
-  /* ---------------- READING MODE ---------------- */
-  function applyReadingMode() {
-    if (readingMode === "vertical") {
-      viewer.style.flexDirection = "column";
-      viewer.style.overflowY = "auto";
-      viewer.style.overflowX = "hidden";
-    } else {
-      viewer.style.flexDirection = "row";
-      viewer.style.overflowX = "auto";
-      viewer.style.overflowY = "hidden";
-    }
+function renderHorizontal() {
+  pdfDoc.getPage(pageNum).then(page => {
+    const vp = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = vp.width;
+    canvas.height = vp.height;
+    canvas.className = "page";
+    viewer.appendChild(canvas);
+    page.render({ canvasContext: canvas.getContext("2d"), viewport: vp });
+  });
+}
+
+/* ---------------- MODE TOGGLE ---------------- */
+function toggleMode() {
+  readingMode = readingMode === "vertical" ? "horizontal" : "vertical";
+  showToast(readingMode === "vertical" ? "Vertical Mode" : "Horizontal Mode");
+  render();
+}
+
+function showToast(text) {
+  toast.textContent = text;
+  toast.style.opacity = 1;
+  setTimeout(() => toast.style.opacity = 0, 1000);
+}
+
+/* ---------------- GESTURES ---------------- */
+
+// DOUBLE TAP → RESET ZOOM
+viewer.addEventListener("touchend", e => {
+  const now = Date.now();
+  if (now - lastTap < 300) {
+    scale = BASE_SCALE;
+    document.body.style.zoom = "1";
+    render();
   }
+  lastTap = now;
+});
 
-  /* ---------------- TOUCH START ---------------- */
-  viewer.addEventListener("touchstart", e => {
+// TWO-FINGER SWIPE → TOGGLE MODE
+let twoFingerStartY = 0;
+viewer.addEventListener("touchstart", e => {
+  if (e.touches.length === 2) {
+    twoFingerStartY =
+      (e.touches[0].clientY + e.touches[1].clientY) / 2;
+  }
+});
 
-    // HARD CANCEL if multitouch
-    if (e.touches.length > 1) {
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
-      return;
-    }
-
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    hasMoved = false;
-
-    longPressTimer = setTimeout(() => {
-      if (!hasMoved) {
-        annotationMode = true;
-        picker.style.display = "flex";
-      }
-    }, 650);
-  });
-
-  /* ---------------- TOUCH MOVE ---------------- */
-  viewer.addEventListener("touchmove", e => {
-
-    // SECOND FINGER → CANCEL ANNOTATION
-    if (e.touches.length > 1) {
-      clearTimeout(longPressTimer);
-      return;
-    }
-
-    const x = e.touches[0].clientX;
-    const y = e.touches[0].clientY;
-
-    if (Math.abs(x - startX) > 14 || Math.abs(y - startY) > 14) {
-      hasMoved = true;
-      clearTimeout(longPressTimer);
-    }
-
-    if (!annotationMode) return;
-
-    if (!activeHighlight &&
-        (Math.abs(x - startX) > 18 || Math.abs(y - startY) > 18)) {
-
-      activeHighlight = document.createElement("div");
-      activeHighlight.className = "highlight";
-      activeHighlight.style.background = currentColor;
-      viewer.appendChild(activeHighlight);
-    }
-
-    if (activeHighlight) {
-      Object.assign(activeHighlight.style, {
-        left: Math.min(startX, x) + "px",
-        top: Math.min(startY, y) + "px",
-        width: Math.abs(x - startX) + "px",
-        height: Math.abs(y - startY) + "px"
-      });
-      e.preventDefault();
-    }
-  }, { passive: false });
-
-  /* ---------------- TOUCH END ---------------- */
-  viewer.addEventListener("touchend", e => {
-    clearTimeout(longPressTimer);
-
-    if (activeHighlight) {
-      saveHighlight({
-        page: pageNum,
-        x: activeHighlight.style.left,
-        y: activeHighlight.style.top,
-        w: activeHighlight.style.width,
-        h: activeHighlight.style.height,
-        color: currentColor,
-        note: ""
-      });
-      activeHighlight = null;
-    }
-
-    const now = Date.now();
-    if (now - lastTap < 300) {
-      if (annotationMode) {
-        annotationMode = false;
-        picker.style.display = "none";
-      } else {
-        scale = 1.4;
-        renderPage();
-        loadHighlights();
-      }
-    }
-    lastTap = now;
-  });
-
-  /* ---------------- TWO-FINGER MODE SWITCH ---------------- */
-  viewer.addEventListener("touchstart", e => {
-    if (e.touches.length === 2) {
-      twoFingerActive = true;
-      twoFingerStartY =
-        (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    }
-  });
-
-  viewer.addEventListener("touchend", e => {
-    if (!twoFingerActive) return;
-
+// END → CHECK MODE SWITCH
+viewer.addEventListener("touchend", e => {
+  if (e.changedTouches.length === 1 && twoFingerStartY !== 0) {
     const endY = e.changedTouches[0].clientY;
-    const diffY = endY - twoFingerStartY;
+    if (Math.abs(endY - twoFingerStartY) > 80) toggleMode();
+    twoFingerStartY = 0;
+  }
+});
 
-    if (Math.abs(diffY) > 80) {
-      readingMode =
-        readingMode === "vertical" ? "horizontal" : "vertical";
-      applyReadingMode();
+// HORIZONTAL PAGE CHANGE (ONLY IN HORIZONTAL MODE)
+viewer.addEventListener("touchstart", e => {
+  if (readingMode !== "horizontal") return;
+  startX = e.touches[0].clientX;
+});
+
+viewer.addEventListener("touchend", e => {
+  if (readingMode !== "horizontal") return;
+  const diff = startX - e.changedTouches[0].clientX;
+
+  if (Math.abs(diff) > 80) {
+    if (diff > 0 && pageNum < pdfDoc.numPages) {
+      pageNum++;
+      render();
     }
-
-    twoFingerActive = false;
-  });
-
-  /* ---------------- STORAGE ---------------- */
-  function saveHighlight(h) {
-    const d = JSON.parse(localStorage.getItem(storeKey) || "[]");
-    d.push(h);
-    localStorage.setItem(storeKey, JSON.stringify(d));
-    loadHighlights();
+    if (diff < 0 && pageNum > 1) {
+      pageNum--;
+      render();
+    }
   }
-
-  function loadHighlights() {
-    viewer.querySelectorAll(".highlight").forEach(h => h.remove());
-    const d = JSON.parse(localStorage.getItem(storeKey) || "[]");
-
-    d.filter(h => h.page === pageNum).forEach((h, index) => {
-      const el = document.createElement("div");
-      el.className = "highlight";
-      Object.assign(el.style, {
-        left: h.x,
-        top: h.y,
-        width: h.w,
-        height: h.h,
-        background: h.color
-      });
-
-      el.onclick = () => {
-        if (!annotationMode) {
-          textarea.value = h.note || "";
-          sheet.style.bottom = "0";
-        }
-      };
-
-      el.addEventListener("touchstart", () => {
-        if (!annotationMode) return;
-        deleteTimer = setTimeout(() => {
-          d.splice(index, 1);
-          localStorage.setItem(storeKey, JSON.stringify(d));
-          loadHighlights();
-        }, 650);
-      });
-
-      el.addEventListener("touchend", () =>
-        clearTimeout(deleteTimer)
-      );
-
-      viewer.appendChild(el);
-    });
-  }
-
-  picker.querySelectorAll(".color").forEach(c =>
-    c.onclick = () => currentColor = c.dataset.color
-  );
-
-  document.getElementById("saveNote").onclick = () => {
-    sheet.style.bottom = "-100%";
-  };
+});
 </script>
 
 </body>
