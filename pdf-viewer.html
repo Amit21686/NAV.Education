@@ -13,7 +13,8 @@
     background: #0a0a14;
     overflow: hidden;
     user-select: none;
-    font-family: system-ui, -apple-system;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+    -webkit-tap-highlight-color: transparent;
   }
 
   #viewer {
@@ -21,12 +22,20 @@
     width: 100vw;
     height: 100vh;
     overflow: auto;
+    touch-action: pan-y pinch-zoom;
   }
 
   canvas {
     display: block;
-    margin: 16px auto;
+    margin: 0 auto;
     background: #ffffff;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Page container for relative positioning */
+  .page-container {
+    position: relative;
+    margin: 0 auto;
   }
 
   /* Highlight */
@@ -34,6 +43,13 @@
     position: absolute;
     border-radius: 4px;
     background: rgba(250,204,21,0.4);
+    pointer-events: auto;
+    transition: transform 0.1s ease;
+  }
+
+  .highlight.selected {
+    outline: 2px solid #7c4dff;
+    outline-offset: 1px;
   }
 
   /* Color Picker */
@@ -45,13 +61,29 @@
     display: none;
     gap: 12px;
     z-index: 20;
+    background: rgba(17, 24, 39, 0.9);
+    padding: 12px 16px;
+    border-radius: 50px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
   }
 
   .color {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    border: 2px solid #fff;
+    border: 3px solid transparent;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+    cursor: pointer;
+  }
+
+  .color:hover, .color:active {
+    transform: scale(1.1);
+  }
+
+  .color.active {
+    border-color: #fff;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
   }
 
   /* Note Sheet */
@@ -62,30 +94,197 @@
     width: 100%;
     background: #111827;
     border-radius: 20px 20px 0 0;
-    padding: 16px;
-    transition: bottom 0.25s ease;
-    z-index: 30;
+    padding: 24px 20px;
+    transition: bottom 0.3s ease;
+    z-index: 100;
+    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.3);
+  }
+
+  #noteSheetHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    color: white;
+  }
+
+  #closeNote {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    font-size: 18px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #closeNote:active {
+    background: rgba(255, 255, 255, 0.1);
   }
 
   textarea {
     width: 100%;
-    height: 80px;
+    height: 120px;
     border-radius: 12px;
-    border: none;
-    padding: 10px;
-    font-size: 14px;
+    border: 2px solid #374151;
+    padding: 14px;
+    font-size: 16px;
+    background: #1f2937;
+    color: white;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-color: #7c4dff;
   }
 
   #saveNote {
-    margin-top: 12px;
-    background: #7c4dff;
+    margin-top: 16px;
+    background: linear-gradient(135deg, #7c4dff, #5e35b1);
     color: #fff;
     border: none;
     width: 100%;
-    padding: 12px;
+    padding: 16px;
     border-radius: 14px;
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+  }
+
+  #saveNote:active {
+    opacity: 0.9;
+  }
+
+  /* Page Indicator */
+  #pageIndicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(17, 24, 39, 0.9);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Mode Indicator */
+  #modeIndicator {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: rgba(17, 24, 39, 0.9);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Toast Notification */
+  .toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(17, 24, 39, 0.95);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 14px;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Delete confirmation */
+  .delete-confirm {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #1f2937;
+    color: white;
+    padding: 24px;
+    border-radius: 16px;
+    z-index: 1000;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    display: none;
+  }
+
+  .delete-confirm.show {
+    display: block;
+  }
+
+  .delete-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .delete-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  #confirmDelete {
+    background: #dc2626;
+    color: white;
+  }
+
+  #cancelDelete {
+    background: #374151;
+    color: white;
+  }
+
+  /* Loading */
+  .loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 18px;
+  }
+
+  /* Instructions */
+  #instructions {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(17, 24, 39, 0.9);
+    color: #9ca3af;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 12px;
+    text-align: center;
+    max-width: 300px;
+    backdrop-filter: blur(10px);
+    transition: opacity 0.3s ease;
   }
 </style>
 </head>
@@ -94,225 +293,535 @@
 
 <div id="viewer"></div>
 
+<div id="pageIndicator">Page: 1/1</div>
+<div id="modeIndicator">Mode: View</div>
+
 <div id="colorPicker">
-  <div class="color" style="background:#facc15" data-color="rgba(250,204,21,0.4)"></div>
+  <div class="color active" style="background:#facc15" data-color="rgba(250,204,21,0.4)"></div>
   <div class="color" style="background:#4ade80" data-color="rgba(74,222,128,0.4)"></div>
   <div class="color" style="background:#60a5fa" data-color="rgba(96,165,250,0.4)"></div>
   <div class="color" style="background:#f472b6" data-color="rgba(244,114,182,0.4)"></div>
 </div>
 
+<div id="instructions">Long press to enter highlight mode • Double tap to reset zoom</div>
+
 <div id="noteSheet">
-  <textarea placeholder="Write your note..."></textarea>
-  <button id="saveNote">Save</button>
+  <div id="noteSheetHeader">
+    <h3 style="margin: 0; font-weight: 600;">Add Note</h3>
+    <button id="closeNote">✕</button>
+  </div>
+  <textarea placeholder="Write your note... (Max 500 characters)" maxlength="500"></textarea>
+  <button id="saveNote">Save Note</button>
 </div>
+
+<div class="toast" id="toast"></div>
+
+<div class="delete-confirm" id="deleteConfirm">
+  <p>Delete this highlight and its note?</p>
+  <div class="delete-actions">
+    <button class="delete-btn" id="cancelDelete">Cancel</button>
+    <button class="delete-btn" id="confirmDelete">Delete</button>
+  </div>
+</div>
+
+<div class="loading" id="loading">Loading PDF...</div>
 
 <script>
 /* ---------------- STATE ---------------- */
 const params = new URLSearchParams(location.search);
-const pdfUrl = params.get("file");
-const storeKey = "annotations_" + pdfUrl;
+const pdfUrl = params.get("file") || "demo.pdf"; // Default for testing
+const storeKey = "annotations_" + pdfUrl.replace(/[^a-zA-Z0-9]/g, '_');
 
 let pdfDoc = null;
 let pageNum = 1;
 let scale = 1.4;
 const BASE_SCALE = 1.4;
+let canvas = null;
+let pageViewport = null;
 
 let annotationMode = false;
 let longPressTimer = null;
 let deleteTimer = null;
+let selectedHighlightIndex = -1;
 
 let startX = 0, startY = 0;
 let swipeStartX = 0, swipeStartY = 0;
 let activeHighlight = null;
 let currentColor = "rgba(250,204,21,0.4)";
-let lastTap = 0;
+let lastTapTime = 0;
+let lastTapX = 0;
+let lastTapY = 0;
+const DOUBLE_TAP_DELAY = 300;
+const DOUBLE_TAP_DISTANCE = 30;
 
 const viewer = document.getElementById("viewer");
 const picker = document.getElementById("colorPicker");
 const sheet = document.getElementById("noteSheet");
 const textarea = sheet.querySelector("textarea");
+const pageIndicator = document.getElementById("pageIndicator");
+const modeIndicator = document.getElementById("modeIndicator");
+const loading = document.getElementById("loading");
+const toast = document.getElementById("toast");
+const deleteConfirm = document.getElementById("deleteConfirm");
+
+/* ---------------- UTILITIES ---------------- */
+function showToast(message, duration = 2000) {
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), duration);
+}
+
+function getRelativeCoordinates(clientX, clientY, pageRect) {
+  // Convert screen coordinates to page-relative coordinates
+  const x = ((clientX - pageRect.left) / pageRect.width) * 100;
+  const y = ((clientY - pageRect.top) / pageRect.height) * 100;
+  return { x, y };
+}
+
+function getAbsoluteCoordinates(percentX, percentY, pageRect) {
+  // Convert percentage coordinates back to absolute
+  const x = (percentX / 100) * pageRect.width;
+  const y = (percentY / 100) * pageRect.height;
+  return { x, y };
+}
 
 /* ---------------- PDF INIT ---------------- */
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
+loading.style.display = 'block';
+
 pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
   pdfDoc = pdf;
+  loading.style.display = 'none';
+  updatePageIndicator();
   render();
+}).catch(err => {
+  loading.textContent = 'Failed to load PDF';
+  console.error('PDF loading error:', err);
 });
 
 /* ---------------- RENDER ---------------- */
-function render() {
+async function render() {
   viewer.innerHTML = "";
   annotationMode = false;
   picker.style.display = "none";
+  modeIndicator.textContent = "Mode: View";
+  
+  // Clear any active timers
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
 
-  pdfDoc.getPage(pageNum).then(page => {
-    const vp = page.getViewport({ scale });
-    const canvas = document.createElement("canvas");
-    canvas.width = vp.width;
-    canvas.height = vp.height;
-    viewer.appendChild(canvas);
-    page.render({ canvasContext: canvas.getContext("2d"), viewport: vp });
-    loadHighlights();
-  });
+  try {
+    const page = await pdfDoc.getPage(pageNum);
+    pageViewport = page.getViewport({ scale });
+    
+    const container = document.createElement("div");
+    container.className = "page-container";
+    container.style.width = pageViewport.width + "px";
+    container.style.height = pageViewport.height + "px";
+    container.style.margin = "16px auto";
+    container.style.position = "relative";
+    
+    canvas = document.createElement("canvas");
+    canvas.width = pageViewport.width;
+    canvas.height = pageViewport.height;
+    canvas.style.cursor = "pointer";
+    
+    container.appendChild(canvas);
+    viewer.appendChild(container);
+    
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport: pageViewport });
+    loadHighlights(container);
+    
+  } catch (err) {
+    console.error('Render error:', err);
+    showToast('Error loading page');
+  }
 }
 
-/* ---------------- DOUBLE TAP RESET ---------------- */
-viewer.addEventListener("touchend", () => {
+/* ---------------- TOUCH HANDLERS ---------------- */
+let isSwiping = false;
+
+viewer.addEventListener("touchstart", (e) => {
+  if (e.touches.length !== 1) return;
+  
+  const touch = e.touches[0];
+  startX = touch.clientX;
+  startY = touch.clientY;
+  swipeStartX = touch.clientX;
+  swipeStartY = touch.clientY;
+  
   const now = Date.now();
-  if (now - lastTap < 300) {
-    scale = BASE_SCALE;
-    render();
-  }
-  lastTap = now;
-});
-
-/* ---------------- PAGE SWIPE (EDGE LOCKED) ---------------- */
-viewer.addEventListener("touchstart", e => {
-  if (annotationMode) return;
-  if (e.touches.length !== 1) return;
-
-  swipeStartX = e.touches[0].clientX;
-  swipeStartY = e.touches[0].clientY;
-});
-
-viewer.addEventListener("touchend", e => {
-  if (annotationMode) return;
-  if (!swipeStartX) return;
-
-  const endX = e.changedTouches[0].clientX;
-  const endY = e.changedTouches[0].clientY;
-
-  const dx = endX - swipeStartX;
-  const dy = Math.abs(endY - swipeStartY);
-  const screenWidth = window.innerWidth;
-
-  // Must be horizontal
-  if (Math.abs(dx) > 90 && dy < 60) {
-
-    // NEXT PAGE (swipe left from right edge)
-    if (dx < 0 &&
-        swipeStartX > screenWidth * 0.65 &&
-        pageNum < pdfDoc.numPages) {
-      pageNum++;
-      render();
-    }
-
-    // PREVIOUS PAGE (swipe right from left edge)
-    if (dx > 0 &&
-        swipeStartX < screenWidth * 0.35 &&
-        pageNum > 1) {
-      pageNum--;
-      render();
-    }
-  }
-
-  swipeStartX = 0;
-});
-
-/* ---------------- ANNOTATION ---------------- */
-viewer.addEventListener("touchstart", e => {
-  if (e.touches.length !== 1) return;
-
-  startX = e.touches[0].clientX;
-  startY = e.touches[0].clientY;
-
-  longPressTimer = setTimeout(() => {
-    annotationMode = true;
-    picker.style.display = "flex";
-  }, 650);
-});
-
-viewer.addEventListener("touchmove", e => {
-  if (!annotationMode || e.touches.length !== 1) return;
-
-  const x = e.touches[0].clientX;
-  const y = e.touches[0].clientY;
-
-  if (!activeHighlight &&
-      (Math.abs(x - startX) > 18 || Math.abs(y - startY) > 18)) {
-    activeHighlight = document.createElement("div");
-    activeHighlight.className = "highlight";
-    activeHighlight.style.background = currentColor;
-    viewer.appendChild(activeHighlight);
-  }
-
-  if (activeHighlight) {
-    Object.assign(activeHighlight.style, {
-      left: Math.min(startX, x) + "px",
-      top: Math.min(startY, y) + "px",
-      width: Math.abs(x - startX) + "px",
-      height: Math.abs(y - startY) + "px"
-    });
+  const timeDiff = now - lastTapTime;
+  const dist = Math.sqrt(
+    Math.pow(touch.clientX - lastTapX, 2) + 
+    Math.pow(touch.clientY - lastTapY, 2)
+  );
+  
+  // Check for double tap
+  if (timeDiff < DOUBLE_TAP_DELAY && dist < DOUBLE_TAP_DISTANCE) {
     e.preventDefault();
+    if (scale > BASE_SCALE) {
+      scale = BASE_SCALE;
+    } else {
+      scale = 2.0;
+    }
+    render();
+    showToast(scale > BASE_SCALE ? "Zoomed in" : "Zoom reset");
+    lastTapTime = 0;
+    return;
+  }
+  
+  lastTapX = touch.clientX;
+  lastTapY = touch.clientY;
+  
+  // Start long press timer only if not already in annotation mode
+  if (!annotationMode) {
+    longPressTimer = setTimeout(() => {
+      annotationMode = true;
+      picker.style.display = "flex";
+      modeIndicator.textContent = "Mode: Highlight";
+      showToast("Highlight mode active. Drag to highlight.");
+      // Clear the timer variable
+      longPressTimer = null;
+    }, 650);
+  }
+});
+
+viewer.addEventListener("touchmove", (e) => {
+  if (e.touches.length !== 1) return;
+  
+  const touch = e.touches[0];
+  const dx = touch.clientX - startX;
+  const dy = touch.clientY - startY;
+  
+  // If moving significantly, cancel long press
+  if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+    
+    // Handle annotation creation
+    if (annotationMode && !activeHighlight) {
+      activeHighlight = document.createElement("div");
+      activeHighlight.className = "highlight";
+      activeHighlight.style.background = currentColor;
+      
+      // Position relative to page container
+      const pageContainer = viewer.querySelector('.page-container');
+      if (pageContainer) {
+        const rect = pageContainer.getBoundingClientRect();
+        const relStart = getRelativeCoordinates(startX, startY, rect);
+        
+        activeHighlight.dataset.startX = relStart.x;
+        activeHighlight.dataset.startY = relStart.y;
+        activeHighlight.style.left = `${relStart.x}%`;
+        activeHighlight.style.top = `${relStart.y}%`;
+        
+        pageContainer.appendChild(activeHighlight);
+      }
+    }
+    
+    // Update active highlight
+    if (annotationMode && activeHighlight) {
+      const pageContainer = viewer.querySelector('.page-container');
+      if (pageContainer) {
+        const rect = pageContainer.getBoundingClientRect();
+        const relCurrent = getRelativeCoordinates(touch.clientX, touch.clientY, rect);
+        const relStart = {
+          x: parseFloat(activeHighlight.dataset.startX),
+          y: parseFloat(activeHighlight.dataset.startY)
+        };
+        
+        const left = Math.min(relStart.x, relCurrent.x);
+        const top = Math.min(relStart.y, relCurrent.y);
+        const width = Math.abs(relCurrent.x - relStart.x);
+        const height = Math.abs(relCurrent.y - relStart.y);
+        
+        Object.assign(activeHighlight.style, {
+          left: left + "%",
+          top: top + "%",
+          width: width + "%",
+          height: height + "%"
+        });
+      }
+      e.preventDefault();
+    }
+    
+    // Check for page swipe
+    if (!annotationMode) {
+      isSwiping = true;
+    }
   }
 }, { passive: false });
 
-viewer.addEventListener("touchend", () => {
-  clearTimeout(longPressTimer);
-
+viewer.addEventListener("touchend", (e) => {
+  const endTime = Date.now();
+  lastTapTime = endTime;
+  
+  // Clear long press timer
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  
+  // Handle annotation finalization
   if (activeHighlight) {
-    saveHighlight({
-      page: pageNum,
-      x: activeHighlight.style.left,
-      y: activeHighlight.style.top,
-      w: activeHighlight.style.width,
-      h: activeHighlight.style.height,
-      color: currentColor,
-      note: ""
-    });
+    const pageContainer = viewer.querySelector('.page-container');
+    if (pageContainer) {
+      const rect = pageContainer.getBoundingClientRect();
+      const style = activeHighlight.style;
+      
+      // Only save if highlight is big enough
+      if (parseFloat(style.width) > 1 && parseFloat(style.height) > 1) {
+        saveHighlight({
+          page: pageNum,
+          x: style.left,
+          y: style.top,
+          w: style.width,
+          h: style.height,
+          color: currentColor,
+          note: ""
+        });
+        showToast("Highlight saved");
+      } else {
+        activeHighlight.remove();
+      }
+    }
     activeHighlight = null;
   }
+  
+  // Handle page swipe
+  if (isSwiping && !annotationMode && e.changedTouches.length === 1) {
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - swipeStartX;
+    const dy = Math.abs(touch.clientY - swipeStartY);
+    const screenWidth = window.innerWidth;
+    
+    // Must be horizontal and not too vertical
+    if (Math.abs(dx) > 50 && dy < 100) {
+      // Swipe left from right half - next page
+      if (dx < 0 && swipeStartX > screenWidth * 0.3 && pageNum < pdfDoc.numPages) {
+        pageNum++;
+        render();
+      }
+      // Swipe right from left half - previous page
+      else if (dx > 0 && swipeStartX < screenWidth * 0.7 && pageNum > 1) {
+        pageNum--;
+        render();
+      }
+    }
+  }
+  
+  isSwiping = false;
+  swipeStartX = 0;
+  swipeStartY = 0;
 });
 
 /* ---------------- STORAGE ---------------- */
-function saveHighlight(h) {
-  const d = JSON.parse(localStorage.getItem(storeKey) || "[]");
-  d.push(h);
-  localStorage.setItem(storeKey, JSON.stringify(d));
-  loadHighlights();
+function saveHighlight(highlight) {
+  const annotations = JSON.parse(localStorage.getItem(storeKey) || "[]");
+  annotations.push(highlight);
+  localStorage.setItem(storeKey, JSON.stringify(annotations));
+  loadHighlights(viewer.querySelector('.page-container'));
 }
 
-function loadHighlights() {
-  viewer.querySelectorAll(".highlight").forEach(h => h.remove());
-  const d = JSON.parse(localStorage.getItem(storeKey) || "[]");
-
-  d.filter(h => h.page === pageNum).forEach((h, index) => {
+function loadHighlights(container) {
+  if (!container) return;
+  
+  // Remove existing highlights
+  container.querySelectorAll(".highlight").forEach(h => h.remove());
+  
+  const annotations = JSON.parse(localStorage.getItem(storeKey) || "[]");
+  const pageAnnotations = annotations.filter(h => h.page === pageNum);
+  
+  pageAnnotations.forEach((h, index) => {
     const el = document.createElement("div");
     el.className = "highlight";
-    Object.assign(el.style, h);
-
-    el.onclick = () => {
+    Object.assign(el.style, {
+      left: h.x,
+      top: h.y,
+      width: h.w,
+      height: h.h,
+      background: h.color
+    });
+    
+    // Store index for deletion
+    el.dataset.index = index;
+    
+    // Click to view/edit note
+    el.onclick = (e) => {
+      if (annotationMode) return; // Don't open note sheet in highlight mode
+      e.stopPropagation();
+      
+      // Remove previous selection
+      container.querySelectorAll('.highlight.selected').forEach(h => {
+        h.classList.remove('selected');
+      });
+      
+      // Select this highlight
+      el.classList.add('selected');
+      selectedHighlightIndex = index;
+      
+      // Show note sheet with existing note
       textarea.value = h.note || "";
       sheet.style.bottom = "0";
     };
-
-    el.addEventListener("touchstart", () => {
+    
+    // Long press to delete (in annotation mode)
+    el.addEventListener("touchstart", (e) => {
       if (!annotationMode) return;
+      
       deleteTimer = setTimeout(() => {
-        d.splice(index, 1);
-        localStorage.setItem(storeKey, JSON.stringify(d));
-        loadHighlights();
-      }, 650);
+        showDeleteConfirmation(index);
+      }, 800);
     });
-
-    el.addEventListener("touchend", () =>
-      clearTimeout(deleteTimer)
-    );
-
-    viewer.appendChild(el);
+    
+    el.addEventListener("touchend", () => {
+      if (deleteTimer) {
+        clearTimeout(deleteTimer);
+        deleteTimer = null;
+      }
+    });
+    
+    el.addEventListener("touchmove", () => {
+      if (deleteTimer) {
+        clearTimeout(deleteTimer);
+        deleteTimer = null;
+      }
+    });
+    
+    container.appendChild(el);
   });
 }
 
-/* ---------------- COLORS & NOTES ---------------- */
-picker.querySelectorAll(".color").forEach(c =>
-  c.onclick = () => currentColor = c.dataset.color
-);
+function deleteHighlight(index) {
+  const annotations = JSON.parse(localStorage.getItem(storeKey) || "[]");
+  if (index >= 0 && index < annotations.length) {
+    annotations.splice(index, 1);
+    localStorage.setItem(storeKey, JSON.stringify(annotations));
+    loadHighlights(viewer.querySelector('.page-container'));
+    showToast("Highlight deleted");
+  }
+}
 
+function showDeleteConfirmation(index) {
+  selectedHighlightIndex = index;
+  deleteConfirm.classList.add('show');
+}
+
+/* ---------------- UI CONTROLS ---------------- */
+// Color picker
+picker.querySelectorAll(".color").forEach(c => {
+  c.onclick = () => {
+    currentColor = c.dataset.color;
+    picker.querySelectorAll('.color').forEach(col => col.classList.remove('active'));
+    c.classList.add('active');
+    showToast(`Color changed`);
+  };
+});
+
+// Note sheet controls
 document.getElementById("saveNote").onclick = () => {
+  if (selectedHighlightIndex === -1) return;
+  
+  const annotations = JSON.parse(localStorage.getItem(storeKey) || "[]");
+  const pageAnnotations = annotations.filter(h => h.page === pageNum);
+  
+  // Find the actual global index
+  let globalIndex = 0;
+  let found = false;
+  for (let i = 0; i < annotations.length; i++) {
+    if (annotations[i].page === pageNum) {
+      if (globalIndex === selectedHighlightIndex) {
+        annotations[i].note = textarea.value;
+        found = true;
+        break;
+      }
+      globalIndex++;
+    }
+  }
+  
+  if (found) {
+    localStorage.setItem(storeKey, JSON.stringify(annotations));
+    showToast("Note saved");
+  }
+  
   sheet.style.bottom = "-100%";
+  viewer.querySelectorAll('.highlight.selected').forEach(h => {
+    h.classList.remove('selected');
+  });
+  selectedHighlightIndex = -1;
 };
+
+document.getElementById("closeNote").onclick = () => {
+  sheet.style.bottom = "-100%";
+  viewer.querySelectorAll('.highlight.selected').forEach(h => {
+    h.classList.remove('selected');
+  });
+  selectedHighlightIndex = -1;
+};
+
+// Delete confirmation
+document.getElementById("confirmDelete").onclick = () => {
+  deleteHighlight(selectedHighlightIndex);
+  deleteConfirm.classList.remove('show');
+  selectedHighlightIndex = -1;
+};
+
+document.getElementById("cancelDelete").onclick = () => {
+  deleteConfirm.classList.remove('show');
+  selectedHighlightIndex = -1;
+};
+
+// Close delete confirm on background click
+deleteConfirm.addEventListener('click', (e) => {
+  if (e.target === deleteConfirm) {
+    deleteConfirm.classList.remove('show');
+  }
+});
+
+/* ---------------- HELPER FUNCTIONS ---------------- */
+function updatePageIndicator() {
+  if (pdfDoc) {
+    pageIndicator.textContent = `Page: ${pageNum}/${pdfDoc.numPages}`;
+  }
+}
+
+// Exit annotation mode on tap outside
+document.addEventListener('click', (e) => {
+  if (annotationMode && !picker.contains(e.target)) {
+    annotationMode = false;
+    picker.style.display = 'none';
+    modeIndicator.textContent = "Mode: View";
+    showToast("Exited highlight mode");
+  }
+});
+
+// Keyboard shortcuts for testing
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (annotationMode) {
+      annotationMode = false;
+      picker.style.display = 'none';
+      modeIndicator.textContent = "Mode: View";
+    }
+    sheet.style.bottom = "-100%";
+  } else if (e.key === 'ArrowRight' && pageNum < pdfDoc.numPages) {
+    pageNum++;
+    render();
+  } else if (e.key === 'ArrowLeft' && pageNum > 1) {
+    pageNum--;
+    render();
+  }
+});
+
+// Initialize
+updatePageIndicator();
 </script>
 
 </body>
