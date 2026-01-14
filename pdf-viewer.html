@@ -1,150 +1,175 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>PDF Viewer</title>
+<meta charset="UTF-8" />
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="color-scheme" content="dark" />
+<meta name="viewport"
+  content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
 
-  <!-- PDF.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
-  <style>
-    body {
-      margin: 0;
-      background: #0a0a14;
-      color: #ffffff;
-      font-family: Arial, sans-serif;
-      overflow: hidden;
-    }
+<style>
+  body {
+    margin: 0;
+    background: #0a0a14;
+    overflow: hidden;
+    touch-action: pan-x pan-y pinch-zoom;
+    user-select: none;
+  }
 
-    #toolbar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px;
-      background: #111827;
-      border-bottom: 1px solid #1f2933;
-    }
+  #viewer {
+    width: 100vw;
+    height: 100vh;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
 
-    button {
-      background: #1f2937;
-      color: #ffffff;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 14px;
-    }
+  canvas {
+    background: white;
+    max-width: 100%;
+    height: auto;
+  }
 
-    button:active {
-      background: #374151;
-    }
+  .highlight {
+    position: absolute;
+    background: rgba(255, 255, 0, 0.35);
+    border-radius: 4px;
+  }
 
-    #page-info {
-      margin-left: auto;
-      font-size: 13px;
-      opacity: 0.8;
-    }
-
-    #viewer {
-      overflow: auto;
-      height: calc(100vh - 52px);
-      padding: 10px;
-    }
-
-    canvas {
-      display: block;
-      margin: 0 auto 20px auto;
-      background: #ffffff;
-    }
-  </style>
+  .note {
+    position: absolute;
+    background: #111827;
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    max-width: 160px;
+  }
+</style>
 </head>
+
 <body>
 
-  <!-- TOOLBAR -->
-  <div id="toolbar">
-    <button onclick="zoomOut()">−</button>
-    <button onclick="zoomIn()">+</button>
-    <button onclick="prevPage()">◀</button>
-    <button onclick="nextPage()">▶</button>
-    <div id="page-info">Page 1</div>
-  </div>
+<div id="viewer"></div>
 
-  <!-- PDF VIEW -->
-  <div id="viewer"></div>
+<script>
+  const params = new URLSearchParams(location.search);
+  const pdfUrl = params.get("file");
+  const storageKey = "pdf_annotations_" + pdfUrl;
 
-  <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const pdfUrl = urlParams.get("file");
+  let pdfDoc = null;
+  let pageNum = 1;
+  let scale = 1.4;
+  let startX = 0;
+  let pressTimer = null;
+  let isLongPress = false;
 
-    if (!pdfUrl) {
-      document.body.innerHTML = "<p style='padding:20px'>No PDF provided</p>";
-      throw new Error("PDF URL missing");
-    }
+  const viewer = document.getElementById("viewer");
 
-    let pdfDoc = null;
-    let pageNum = 1;
-    let scale = 1.2;
-    const viewer = document.getElementById("viewer");
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  /* ---------- LOAD PDF (OFFLINE CACHE) ---------- */
+  pdfjsLib.getDocument({
+    url: pdfUrl,
+    disableStream: false,
+    disableAutoFetch: false
+  }).promise.then(pdf => {
+    pdfDoc = pdf;
+    renderPage(pageNum);
+    loadAnnotations();
+  });
 
-    pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
-      pdfDoc = pdf;
-      renderPage(pageNum);
-    });
+  function renderPage(num) {
+    pdfDoc.getPage(num).then(page => {
+      viewer.innerHTML = "";
 
-    function renderPage(num) {
-      pdfDoc.getPage(num).then(page => {
-        viewer.innerHTML = "";
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
 
-        const viewport = page.getViewport({ scale });
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
 
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
+      viewer.appendChild(canvas);
 
-        viewer.appendChild(canvas);
-
-        page.render({
-          canvasContext: ctx,
-          viewport
-        });
-
-        document.getElementById("page-info").innerText =
-          `Page ${num} / ${pdfDoc.numPages}`;
+      page.render({
+        canvasContext: ctx,
+        viewport
       });
-    }
+    });
+  }
 
-    function nextPage() {
-      if (pageNum < pdfDoc.numPages) {
+  /* ---------- SWIPE PAGE ---------- */
+  viewer.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+    isLongPress = false;
+
+    pressTimer = setTimeout(() => {
+      isLongPress = true;
+    }, 600);
+  });
+
+  viewer.addEventListener("touchend", e => {
+    clearTimeout(pressTimer);
+
+    const endX = e.changedTouches[0].clientX;
+    const diff = startX - endX;
+
+    if (!isLongPress && Math.abs(diff) > 80) {
+      if (diff > 0 && pageNum < pdfDoc.numPages) {
         pageNum++;
         renderPage(pageNum);
+        loadAnnotations();
       }
-    }
-
-    function prevPage() {
-      if (pageNum > 1) {
+      if (diff < 0 && pageNum > 1) {
         pageNum--;
         renderPage(pageNum);
+        loadAnnotations();
       }
     }
+  });
 
-    function zoomIn() {
-      scale += 0.2;
-      renderPage(pageNum);
-    }
+  /* ---------- LONG PRESS = ADD NOTE ---------- */
+  viewer.addEventListener("touchstart", e => {
+    pressTimer = setTimeout(() => {
+      const text = prompt("Add note:");
+      if (!text) return;
 
-    function zoomOut() {
-      if (scale > 0.6) {
-        scale -= 0.2;
-        renderPage(pageNum);
-      }
-    }
-  </script>
+      const rect = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        text,
+        page: pageNum
+      };
+
+      saveAnnotation(rect);
+      showNote(rect);
+    }, 700);
+  });
+
+  function saveAnnotation(note) {
+    const data = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    data.push(note);
+    localStorage.setItem(storageKey, JSON.stringify(data));
+  }
+
+  function loadAnnotations() {
+    const data = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    data.filter(n => n.page === pageNum).forEach(showNote);
+  }
+
+  function showNote(note) {
+    const div = document.createElement("div");
+    div.className = "note";
+    div.style.left = note.x + "px";
+    div.style.top = note.y + "px";
+    div.innerText = note.text;
+    viewer.appendChild(div);
+  }
+</script>
 
 </body>
 </html>
