@@ -1,0 +1,25 @@
+{
+  "quiz_title": "Cell Quiz",
+  "questions": [
+    {
+      "question": "Who discovered the cell?",
+      "options": [
+        "Robert Hooke",
+        "Darwin",
+        "Watson",
+        "Mendel"
+      ],
+      "answer": 0
+    },
+    {
+      "question": "Cell is the _____ unit of life.",
+      "options": [
+        "Structural",
+        "Functional",
+        "Both A and B",
+        "None"
+      ],
+      "answer": 2
+    }
+  ]
+}
