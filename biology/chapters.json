@@ -1,0 +1,16 @@
+{
+  "chapters": [
+    {
+      "id": "cell",
+      "title": "Cell: Structure and Function",
+      "notes_url": "https://raw.githubusercontent.com/amit21686/NAV.Education/main/biology/notes/cell.json",
+      "quiz_url": "https://raw.githubusercontent.com/amit21686/NAV.Education/main/biology/quizzes/cell_quiz.json"
+    },
+    {
+      "id": "genetics",
+      "title": "Genetics",
+      "notes_url": "https://raw.githubusercontent.com/amit21686/NAV.Education/main/biology/notes/genetics.json",
+      "quiz_url": "https://raw.githubusercontent.com/amit21686/NAV.Education/main/biology/quizzes/genetics_quiz.json"
+    }
+  ]
+}
