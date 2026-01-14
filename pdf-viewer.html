@@ -17,27 +17,81 @@
   }
 
   #viewer {
-    position: relative;
     width: 100vw;
     height: 100vh;
     overflow: auto;
-  }
-
-  .page {
-    margin: 12px auto;
-    background: #fff;
+    position: relative;
   }
 
   canvas {
     display: block;
-    margin: 0 auto;
-    background: #fff;
+    margin: 12px auto;
+    background: #ffffff;
+  }
+
+  /* HIGHLIGHT */
+  .highlight {
+    position: absolute;
+    border-radius: 4px;
+    background: rgba(250,204,21,0.4);
+  }
+
+  /* COLOR PICKER */
+  #colorPicker {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    gap: 12px;
+    z-index: 20;
+  }
+
+  .color {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+  }
+
+  /* NOTE SHEET */
+  #noteSheet {
+    position: fixed;
+    bottom: -100%;
+    left: 0;
+    width: 100%;
+    background: #111827;
+    border-radius: 20px 20px 0 0;
+    padding: 16px;
+    transition: bottom 0.25s ease;
+    z-index: 30;
+  }
+
+  textarea {
+    width: 100%;
+    height: 80px;
+    border-radius: 12px;
+    border: none;
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  #saveNote {
+    margin-top: 12px;
+    background: #7c4dff;
+    color: #fff;
+    border: none;
+    width: 100%;
+    padding: 12px;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 600;
   }
 
   /* MODE TOAST */
-  #modeToast {
+  #toast {
     position: fixed;
-    top: 20px;
+    top: 18px;
     left: 50%;
     transform: translateX(-50%);
     background: rgba(0,0,0,0.7);
@@ -55,12 +109,25 @@
 <body>
 
 <div id="viewer"></div>
-<div id="modeToast"></div>
+<div id="toast"></div>
+
+<div id="colorPicker">
+  <div class="color" style="background:#facc15" data-color="rgba(250,204,21,0.4)"></div>
+  <div class="color" style="background:#4ade80" data-color="rgba(74,222,128,0.4)"></div>
+  <div class="color" style="background:#60a5fa" data-color="rgba(96,165,250,0.4)"></div>
+  <div class="color" style="background:#f472b6" data-color="rgba(244,114,182,0.4)"></div>
+</div>
+
+<div id="noteSheet">
+  <textarea placeholder="Write your note..."></textarea>
+  <button id="saveNote">Save</button>
+</div>
 
 <script>
 /* ---------------- STATE ---------------- */
 const params = new URLSearchParams(location.search);
 const pdfUrl = params.get("file");
+const storeKey = "annotations_" + pdfUrl;
 
 let pdfDoc = null;
 let pageNum = 1;
@@ -68,11 +135,20 @@ let scale = 1.4;
 const BASE_SCALE = 1.4;
 
 let readingMode = "vertical"; // vertical | horizontal
+let annotationMode = false;
+
+let longPressTimer = null;
+let startX = 0, startY = 0;
+let activeHighlight = null;
+let currentColor = "rgba(250,204,21,0.4)";
 let lastTap = 0;
-let startX = 0;
+let twoFingerStartY = 0;
 
 const viewer = document.getElementById("viewer");
-const toast = document.getElementById("modeToast");
+const toast = document.getElementById("toast");
+const picker = document.getElementById("colorPicker");
+const sheet = document.getElementById("noteSheet");
+const textarea = sheet.querySelector("textarea");
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -86,64 +162,38 @@ pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
 /* ---------------- RENDER ---------------- */
 function render() {
   viewer.innerHTML = "";
-  if (readingMode === "vertical") renderVertical();
-  else renderHorizontal();
-}
+  annotationMode = false;
+  picker.style.display = "none";
 
-function renderVertical() {
-  for (let i = 1; i <= pdfDoc.numPages; i++) {
-    pdfDoc.getPage(i).then(page => {
-      const vp = page.getViewport({ scale });
-      const canvas = document.createElement("canvas");
-      canvas.width = vp.width;
-      canvas.height = vp.height;
-      canvas.className = "page";
-      viewer.appendChild(canvas);
-      page.render({ canvasContext: canvas.getContext("2d"), viewport: vp });
-    });
+  if (readingMode === "vertical") {
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      renderPage(i);
+    }
+  } else {
+    renderPage(pageNum);
+    loadHighlights();
   }
 }
 
-function renderHorizontal() {
-  pdfDoc.getPage(pageNum).then(page => {
+function renderPage(num) {
+  pdfDoc.getPage(num).then(page => {
     const vp = page.getViewport({ scale });
     const canvas = document.createElement("canvas");
     canvas.width = vp.width;
     canvas.height = vp.height;
-    canvas.className = "page";
     viewer.appendChild(canvas);
     page.render({ canvasContext: canvas.getContext("2d"), viewport: vp });
   });
 }
 
-/* ---------------- MODE TOGGLE ---------------- */
-function toggleMode() {
-  readingMode = readingMode === "vertical" ? "horizontal" : "vertical";
-  showToast(readingMode === "vertical" ? "Vertical Mode" : "Horizontal Mode");
-  render();
-}
-
+/* ---------------- TOAST ---------------- */
 function showToast(text) {
   toast.textContent = text;
   toast.style.opacity = 1;
-  setTimeout(() => toast.style.opacity = 0, 1000);
+  setTimeout(() => toast.style.opacity = 0, 900);
 }
 
-/* ---------------- GESTURES ---------------- */
-
-// DOUBLE TAP → RESET ZOOM
-viewer.addEventListener("touchend", e => {
-  const now = Date.now();
-  if (now - lastTap < 300) {
-    scale = BASE_SCALE;
-    document.body.style.zoom = "1";
-    render();
-  }
-  lastTap = now;
-});
-
-// TWO-FINGER SWIPE → TOGGLE MODE
-let twoFingerStartY = 0;
+/* ---------------- MODE SWITCH ---------------- */
 viewer.addEventListener("touchstart", e => {
   if (e.touches.length === 2) {
     twoFingerStartY =
@@ -151,18 +201,34 @@ viewer.addEventListener("touchstart", e => {
   }
 });
 
-// END → CHECK MODE SWITCH
 viewer.addEventListener("touchend", e => {
-  if (e.changedTouches.length === 1 && twoFingerStartY !== 0) {
-    const endY = e.changedTouches[0].clientY;
-    if (Math.abs(endY - twoFingerStartY) > 80) toggleMode();
-    twoFingerStartY = 0;
+  if (twoFingerStartY === 0) return;
+  const endY = e.changedTouches[0].clientY;
+
+  if (Math.abs(endY - twoFingerStartY) > 80) {
+    readingMode = readingMode === "vertical" ? "horizontal" : "vertical";
+    showToast(
+      readingMode === "vertical" ? "Vertical Mode" : "Horizontal Mode"
+    );
+    render();
   }
+  twoFingerStartY = 0;
 });
 
-// HORIZONTAL PAGE CHANGE (ONLY IN HORIZONTAL MODE)
+/* ---------------- DOUBLE TAP RESET ---------------- */
+viewer.addEventListener("touchend", e => {
+  const now = Date.now();
+  if (now - lastTap < 300) {
+    scale = BASE_SCALE;
+    render();
+  }
+  lastTap = now;
+});
+
+/* ---------------- PAGE SWIPE (HORIZONTAL MODE ONLY) ---------------- */
 viewer.addEventListener("touchstart", e => {
   if (readingMode !== "horizontal") return;
+  if (e.touches.length !== 1) return;
   startX = e.touches[0].clientX;
 });
 
@@ -171,16 +237,112 @@ viewer.addEventListener("touchend", e => {
   const diff = startX - e.changedTouches[0].clientX;
 
   if (Math.abs(diff) > 80) {
-    if (diff > 0 && pageNum < pdfDoc.numPages) {
-      pageNum++;
-      render();
-    }
-    if (diff < 0 && pageNum > 1) {
-      pageNum--;
-      render();
-    }
+    if (diff > 0 && pageNum < pdfDoc.numPages) pageNum++;
+    if (diff < 0 && pageNum > 1) pageNum--;
+    render();
   }
 });
+
+/* ---------------- ANNOTATION (HORIZONTAL MODE ONLY) ---------------- */
+viewer.addEventListener("touchstart", e => {
+  if (readingMode !== "horizontal") return;
+  if (e.touches.length !== 1) return;
+
+  startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
+
+  longPressTimer = setTimeout(() => {
+    annotationMode = true;
+    picker.style.display = "flex";
+  }, 650);
+});
+
+viewer.addEventListener("touchmove", e => {
+  if (!annotationMode) return;
+  if (e.touches.length !== 1) return;
+
+  const x = e.touches[0].clientX;
+  const y = e.touches[0].clientY;
+
+  if (!activeHighlight &&
+      (Math.abs(x - startX) > 18 || Math.abs(y - startY) > 18)) {
+
+    activeHighlight = document.createElement("div");
+    activeHighlight.className = "highlight";
+    activeHighlight.style.background = currentColor;
+    viewer.appendChild(activeHighlight);
+  }
+
+  if (activeHighlight) {
+    Object.assign(activeHighlight.style, {
+      left: Math.min(startX, x) + "px",
+      top: Math.min(startY, y) + "px",
+      width: Math.abs(x - startX) + "px",
+      height: Math.abs(y - startY) + "px"
+    });
+    e.preventDefault();
+  }
+}, { passive: false });
+
+viewer.addEventListener("touchend", () => {
+  clearTimeout(longPressTimer);
+
+  if (activeHighlight) {
+    saveHighlight({
+      page: pageNum,
+      x: activeHighlight.style.left,
+      y: activeHighlight.style.top,
+      w: activeHighlight.style.width,
+      h: activeHighlight.style.height,
+      color: currentColor,
+      note: ""
+    });
+    activeHighlight = null;
+  }
+});
+
+/* ---------------- STORAGE ---------------- */
+function saveHighlight(h) {
+  const d = JSON.parse(localStorage.getItem(storeKey) || "[]");
+  d.push(h);
+  localStorage.setItem(storeKey, JSON.stringify(d));
+  loadHighlights();
+}
+
+function loadHighlights() {
+  viewer.querySelectorAll(".highlight").forEach(h => h.remove());
+  const d = JSON.parse(localStorage.getItem(storeKey) || "[]");
+
+  d.filter(h => h.page === pageNum).forEach((h, index) => {
+    const el = document.createElement("div");
+    el.className = "highlight";
+    Object.assign(el.style, h);
+
+    el.onclick = () => {
+      textarea.value = h.note || "";
+      sheet.style.bottom = "0";
+    };
+
+    el.addEventListener("touchstart", () => {
+      if (!annotationMode) return;
+      setTimeout(() => {
+        d.splice(index, 1);
+        localStorage.setItem(storeKey, JSON.stringify(d));
+        loadHighlights();
+      }, 650);
+    });
+
+    viewer.appendChild(el);
+  });
+}
+
+picker.querySelectorAll(".color").forEach(c =>
+  c.onclick = () => currentColor = c.dataset.color
+);
+
+document.getElementById("saveNote").onclick = () => {
+  sheet.style.bottom = "-100%";
+};
 </script>
 
 </body>
