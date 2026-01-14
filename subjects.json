@@ -1,0 +1,14 @@
+{
+  "subjects": [
+    {
+      "id": "bio",
+      "name": "Biology",
+      "chapters_url": "https://raw.githubusercontent.com/amit21686/NAV.Education/main/biology/chapters.json"
+    },
+    {
+      "id": "phy",
+      "name": "Physics",
+      "chapters_url": "https://raw.githubusercontent.com/amit21686/NAV.Education/main/physics/chapters.json"
+    }
+  ]
+}
