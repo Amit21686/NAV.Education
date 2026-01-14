@@ -10,32 +10,42 @@
 <style>
   body {
     margin: 0;
+    padding: 0;
     background: #0a0a14;
     overflow: hidden;
     user-select: none;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
     -webkit-tap-highlight-color: transparent;
+    height: 100vh;
+    width: 100vw;
   }
 
   #viewer {
     position: relative;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     overflow: auto;
     touch-action: pan-y pinch-zoom;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .page-container {
+    position: relative;
+    margin: 0 auto;
+    padding: 10px 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100%;
   }
 
   canvas {
     display: block;
-    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
     background: #ffffff;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  }
-
-  /* Page container for relative positioning */
-  .page-container {
-    position: relative;
-    margin: 0 auto;
+    border-radius: 4px;
   }
 
   /* Highlight */
@@ -45,11 +55,13 @@
     background: rgba(250,204,21,0.4);
     pointer-events: auto;
     transition: transform 0.1s ease;
+    box-sizing: border-box;
   }
 
   .highlight.selected {
     outline: 2px solid #7c4dff;
     outline-offset: 1px;
+    z-index: 10;
   }
 
   /* Color Picker */
@@ -268,6 +280,7 @@
     transform: translate(-50%, -50%);
     color: white;
     font-size: 18px;
+    z-index: 1000;
   }
 
   /* Instructions */
@@ -285,6 +298,68 @@
     max-width: 300px;
     backdrop-filter: blur(10px);
     transition: opacity 0.3s ease;
+    z-index: 10;
+  }
+
+  /* Zoom controls */
+  .zoom-controls {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 10;
+  }
+
+  .zoom-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(17, 24, 39, 0.9);
+    color: white;
+    border: none;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .zoom-btn:active {
+    background: rgba(17, 24, 39, 1);
+  }
+
+  /* Fit to width toggle */
+  #fitWidth {
+    position: fixed;
+    bottom: 80px;
+    left: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(17, 24, 39, 0.9);
+    color: white;
+    border: none;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+  }
+
+  #fitWidth:active {
+    background: rgba(17, 24, 39, 1);
+  }
+
+  /* Hide elements when needed */
+  .hidden {
+    display: none !important;
   }
 </style>
 </head>
@@ -303,7 +378,17 @@
   <div class="color" style="background:#f472b6" data-color="rgba(244,114,182,0.4)"></div>
 </div>
 
-<div id="instructions">Long press to enter highlight mode • Double tap to reset zoom</div>
+<div id="instructions">Long press to highlight • Double tap to zoom • Swipe edges for pages</div>
+
+<!-- Zoom Controls -->
+<div class="zoom-controls">
+  <button class="zoom-btn" id="zoomIn">+</button>
+  <button class="zoom-btn" id="zoomOut">-</button>
+  <button class="zoom-btn" id="zoomReset">↺</button>
+</div>
+
+<!-- Fit to Width Toggle -->
+<button id="fitWidth" title="Fit to width">⇄</button>
 
 <div id="noteSheet">
   <div id="noteSheetHeader">
@@ -329,15 +414,16 @@
 <script>
 /* ---------------- STATE ---------------- */
 const params = new URLSearchParams(location.search);
-const pdfUrl = params.get("file") || "demo.pdf"; // Default for testing
+const pdfUrl = params.get("file") || "demo.pdf";
 const storeKey = "annotations_" + pdfUrl.replace(/[^a-zA-Z0-9]/g, '_');
 
 let pdfDoc = null;
 let pageNum = 1;
-let scale = 1.4;
-const BASE_SCALE = 1.4;
+let scale = 1.0;
+let fitToWidth = true;
 let canvas = null;
 let pageViewport = null;
+let currentPageContainer = null;
 
 let annotationMode = false;
 let longPressTimer = null;
@@ -363,6 +449,10 @@ const modeIndicator = document.getElementById("modeIndicator");
 const loading = document.getElementById("loading");
 const toast = document.getElementById("toast");
 const deleteConfirm = document.getElementById("deleteConfirm");
+const zoomInBtn = document.getElementById("zoomIn");
+const zoomOutBtn = document.getElementById("zoomOut");
+const zoomResetBtn = document.getElementById("zoomReset");
+const fitWidthBtn = document.getElementById("fitWidth");
 
 /* ---------------- UTILITIES ---------------- */
 function showToast(message, duration = 2000) {
@@ -371,23 +461,28 @@ function showToast(message, duration = 2000) {
   setTimeout(() => toast.classList.remove('show'), duration);
 }
 
-function getRelativeCoordinates(clientX, clientY, pageRect) {
-  // Convert screen coordinates to page-relative coordinates
-  const x = ((clientX - pageRect.left) / pageRect.width) * 100;
-  const y = ((clientY - pageRect.top) / pageRect.height) * 100;
-  return { x, y };
+function calculateOptimalScale(pageWidth, pageHeight) {
+  const screenWidth = window.innerWidth - 20; // 10px padding on each side
+  const screenHeight = window.innerHeight - 100; // Account for UI elements
+  
+  // Calculate scale to fit width
+  const widthScale = screenWidth / pageWidth;
+  
+  // Calculate scale to fit height
+  const heightScale = screenHeight / pageHeight;
+  
+  // Use the smaller scale to ensure entire page fits
+  return Math.min(widthScale, heightScale, 2.0); // Max 2x zoom initially
 }
 
-function getAbsoluteCoordinates(percentX, percentY, pageRect) {
-  // Convert percentage coordinates back to absolute
-  const x = (percentX / 100) * pageRect.width;
-  const y = (percentY / 100) * pageRect.height;
-  return { x, y };
+function calculateFitToWidthScale(pageWidth) {
+  const screenWidth = window.innerWidth - 20; // 10px padding on each side
+  return screenWidth / pageWidth;
 }
 
 /* ---------------- PDF INIT ---------------- */
 pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.worker.min.js";
 
 loading.style.display = 'block';
 
@@ -416,25 +511,48 @@ async function render() {
 
   try {
     const page = await pdfDoc.getPage(pageNum);
+    const defaultViewport = page.getViewport({ scale: 1.0 });
+    
+    // Calculate scale based on fitToWidth setting
+    if (fitToWidth) {
+      scale = calculateFitToWidthScale(defaultViewport.width);
+    } else if (scale === 1.0) {
+      scale = calculateOptimalScale(defaultViewport.width, defaultViewport.height);
+    }
+    
     pageViewport = page.getViewport({ scale });
     
-    const container = document.createElement("div");
-    container.className = "page-container";
-    container.style.width = pageViewport.width + "px";
-    container.style.height = pageViewport.height + "px";
-    container.style.margin = "16px auto";
-    container.style.position = "relative";
+    currentPageContainer = document.createElement("div");
+    currentPageContainer.className = "page-container";
+    currentPageContainer.style.width = pageViewport.width + "px";
+    currentPageContainer.style.height = pageViewport.height + "px";
     
     canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    
+    // Set canvas dimensions
     canvas.width = pageViewport.width;
     canvas.height = pageViewport.height;
-    canvas.style.cursor = "pointer";
     
-    container.appendChild(canvas);
-    viewer.appendChild(container);
+    // Set display dimensions for proper scaling
+    canvas.style.width = pageViewport.width + "px";
+    canvas.style.height = pageViewport.height + "px";
     
-    await page.render({ canvasContext: canvas.getContext("2d"), viewport: pageViewport });
-    loadHighlights(container);
+    currentPageContainer.appendChild(canvas);
+    viewer.appendChild(currentPageContainer);
+    
+    // Center the page in viewer
+    viewer.scrollTop = 0;
+    viewer.scrollLeft = 0;
+    
+    // Render PDF page
+    await page.render({ 
+      canvasContext: context, 
+      viewport: pageViewport 
+    }).promise;
+    
+    // Load highlights for this page
+    loadHighlights(currentPageContainer);
     
   } catch (err) {
     console.error('Render error:', err);
@@ -464,13 +582,15 @@ viewer.addEventListener("touchstart", (e) => {
   // Check for double tap
   if (timeDiff < DOUBLE_TAP_DELAY && dist < DOUBLE_TAP_DISTANCE) {
     e.preventDefault();
-    if (scale > BASE_SCALE) {
-      scale = BASE_SCALE;
+    // Toggle between fit to width and zoom in
+    if (fitToWidth) {
+      fitToWidth = false;
+      scale = Math.min(scale * 1.5, 3.0);
     } else {
-      scale = 2.0;
+      scale = Math.min(scale * 1.5, 3.0);
     }
     render();
-    showToast(scale > BASE_SCALE ? "Zoomed in" : "Zoom reset");
+    showToast(`Zoom: ${Math.round(scale * 100)}%`);
     lastTapTime = 0;
     return;
   }
@@ -485,7 +605,6 @@ viewer.addEventListener("touchstart", (e) => {
       picker.style.display = "flex";
       modeIndicator.textContent = "Mode: Highlight";
       showToast("Highlight mode active. Drag to highlight.");
-      // Clear the timer variable
       longPressTimer = null;
     }, 650);
   }
@@ -511,37 +630,37 @@ viewer.addEventListener("touchmove", (e) => {
       activeHighlight.className = "highlight";
       activeHighlight.style.background = currentColor;
       
-      // Position relative to page container
-      const pageContainer = viewer.querySelector('.page-container');
-      if (pageContainer) {
-        const rect = pageContainer.getBoundingClientRect();
-        const relStart = getRelativeCoordinates(startX, startY, rect);
-        
-        activeHighlight.dataset.startX = relStart.x;
-        activeHighlight.dataset.startY = relStart.y;
-        activeHighlight.style.left = `${relStart.x}%`;
-        activeHighlight.style.top = `${relStart.y}%`;
-        
-        pageContainer.appendChild(activeHighlight);
-      }
+      // Get container position
+      const containerRect = currentPageContainer.getBoundingClientRect();
+      
+      // Calculate relative position within container
+      const relX = ((startX - containerRect.left) / containerRect.width) * 100;
+      const relY = ((startY - containerRect.top) / containerRect.height) * 100;
+      
+      activeHighlight.style.left = `${relX}%`;
+      activeHighlight.style.top = `${relY}%`;
+      activeHighlight.style.width = '0%';
+      activeHighlight.style.height = '0%';
+      
+      currentPageContainer.appendChild(activeHighlight);
     }
     
     // Update active highlight
     if (annotationMode && activeHighlight) {
-      const pageContainer = viewer.querySelector('.page-container');
-      if (pageContainer) {
-        const rect = pageContainer.getBoundingClientRect();
-        const relCurrent = getRelativeCoordinates(touch.clientX, touch.clientY, rect);
-        const relStart = {
-          x: parseFloat(activeHighlight.dataset.startX),
-          y: parseFloat(activeHighlight.dataset.startY)
-        };
-        
-        const left = Math.min(relStart.x, relCurrent.x);
-        const top = Math.min(relStart.y, relCurrent.y);
-        const width = Math.abs(relCurrent.x - relStart.x);
-        const height = Math.abs(relCurrent.y - relStart.y);
-        
+      const containerRect = currentPageContainer.getBoundingClientRect();
+      const currentX = ((touch.clientX - containerRect.left) / containerRect.width) * 100;
+      const currentY = ((touch.clientY - containerRect.top) / containerRect.height) * 100;
+      
+      const startLeft = parseFloat(activeHighlight.style.left);
+      const startTop = parseFloat(activeHighlight.style.top);
+      
+      const left = Math.min(startLeft, currentX);
+      const top = Math.min(startTop, currentY);
+      const width = Math.abs(currentX - startLeft);
+      const height = Math.abs(currentY - startTop);
+      
+      // Only update if highlight is reasonably sized
+      if (width > 1 && height > 1) {
         Object.assign(activeHighlight.style, {
           left: left + "%",
           top: top + "%",
@@ -571,26 +690,23 @@ viewer.addEventListener("touchend", (e) => {
   
   // Handle annotation finalization
   if (activeHighlight) {
-    const pageContainer = viewer.querySelector('.page-container');
-    if (pageContainer) {
-      const rect = pageContainer.getBoundingClientRect();
-      const style = activeHighlight.style;
-      
-      // Only save if highlight is big enough
-      if (parseFloat(style.width) > 1 && parseFloat(style.height) > 1) {
-        saveHighlight({
-          page: pageNum,
-          x: style.left,
-          y: style.top,
-          w: style.width,
-          h: style.height,
-          color: currentColor,
-          note: ""
-        });
-        showToast("Highlight saved");
-      } else {
-        activeHighlight.remove();
-      }
+    const width = parseFloat(activeHighlight.style.width);
+    const height = parseFloat(activeHighlight.style.height);
+    
+    // Only save if highlight is big enough
+    if (width > 2 && height > 2) {
+      saveHighlight({
+        page: pageNum,
+        x: activeHighlight.style.left,
+        y: activeHighlight.style.top,
+        w: activeHighlight.style.width,
+        h: activeHighlight.style.height,
+        color: currentColor,
+        note: ""
+      });
+      showToast("Highlight saved");
+    } else {
+      activeHighlight.remove();
     }
     activeHighlight = null;
   }
@@ -599,18 +715,17 @@ viewer.addEventListener("touchend", (e) => {
   if (isSwiping && !annotationMode && e.changedTouches.length === 1) {
     const touch = e.changedTouches[0];
     const dx = touch.clientX - swipeStartX;
-    const dy = Math.abs(touch.clientY - swipeStartY);
     const screenWidth = window.innerWidth;
     
-    // Must be horizontal and not too vertical
-    if (Math.abs(dx) > 50 && dy < 100) {
-      // Swipe left from right half - next page
-      if (dx < 0 && swipeStartX > screenWidth * 0.3 && pageNum < pdfDoc.numPages) {
+    // Swipe threshold
+    if (Math.abs(dx) > 50) {
+      // Swipe left - next page
+      if (dx < 0 && pageNum < pdfDoc.numPages) {
         pageNum++;
         render();
       }
-      // Swipe right from left half - previous page
-      else if (dx > 0 && swipeStartX < screenWidth * 0.7 && pageNum > 1) {
+      // Swipe right - previous page
+      else if (dx > 0 && pageNum > 1) {
         pageNum--;
         render();
       }
@@ -622,12 +737,45 @@ viewer.addEventListener("touchend", (e) => {
   swipeStartY = 0;
 });
 
+/* ---------------- ZOOM CONTROLS ---------------- */
+zoomInBtn.addEventListener('click', () => {
+  fitToWidth = false;
+  scale = Math.min(scale * 1.2, 5.0);
+  render();
+  showToast(`Zoom: ${Math.round(scale * 100)}%`);
+});
+
+zoomOutBtn.addEventListener('click', () => {
+  fitToWidth = false;
+  scale = Math.max(scale * 0.8, 0.5);
+  render();
+  showToast(`Zoom: ${Math.round(scale * 100)}%`);
+});
+
+zoomResetBtn.addEventListener('click', () => {
+  fitToWidth = true;
+  scale = 1.0;
+  render();
+  showToast("Fit to width");
+});
+
+fitWidthBtn.addEventListener('click', () => {
+  fitToWidth = !fitToWidth;
+  if (fitToWidth) {
+    scale = 1.0;
+    showToast("Fit to width enabled");
+  } else {
+    showToast("Free zoom enabled");
+  }
+  render();
+});
+
 /* ---------------- STORAGE ---------------- */
 function saveHighlight(highlight) {
   const annotations = JSON.parse(localStorage.getItem(storeKey) || "[]");
   annotations.push(highlight);
   localStorage.setItem(storeKey, JSON.stringify(annotations));
-  loadHighlights(viewer.querySelector('.page-container'));
+  loadHighlights(currentPageContainer);
 }
 
 function loadHighlights(container) {
@@ -655,7 +803,7 @@ function loadHighlights(container) {
     
     // Click to view/edit note
     el.onclick = (e) => {
-      if (annotationMode) return; // Don't open note sheet in highlight mode
+      if (annotationMode) return;
       e.stopPropagation();
       
       // Remove previous selection
@@ -672,7 +820,7 @@ function loadHighlights(container) {
       sheet.style.bottom = "0";
     };
     
-    // Long press to delete (in annotation mode)
+    // Long press to delete
     el.addEventListener("touchstart", (e) => {
       if (!annotationMode) return;
       
@@ -688,24 +836,35 @@ function loadHighlights(container) {
       }
     });
     
-    el.addEventListener("touchmove", () => {
-      if (deleteTimer) {
-        clearTimeout(deleteTimer);
-        deleteTimer = null;
-      }
-    });
-    
     container.appendChild(el);
   });
 }
 
 function deleteHighlight(index) {
   const annotations = JSON.parse(localStorage.getItem(storeKey) || "[]");
-  if (index >= 0 && index < annotations.length) {
-    annotations.splice(index, 1);
-    localStorage.setItem(storeKey, JSON.stringify(annotations));
-    loadHighlights(viewer.querySelector('.page-container'));
-    showToast("Highlight deleted");
+  const pageAnnotations = annotations.filter(h => h.page === pageNum);
+  
+  if (index >= 0 && index < pageAnnotations.length) {
+    // Find the actual index in the full array
+    let actualIndex = -1;
+    let pageCount = 0;
+    
+    for (let i = 0; i < annotations.length; i++) {
+      if (annotations[i].page === pageNum) {
+        if (pageCount === index) {
+          actualIndex = i;
+          break;
+        }
+        pageCount++;
+      }
+    }
+    
+    if (actualIndex !== -1) {
+      annotations.splice(actualIndex, 1);
+      localStorage.setItem(storeKey, JSON.stringify(annotations));
+      loadHighlights(currentPageContainer);
+      showToast("Highlight deleted");
+    }
   }
 }
 
@@ -732,37 +891,44 @@ document.getElementById("saveNote").onclick = () => {
   const annotations = JSON.parse(localStorage.getItem(storeKey) || "[]");
   const pageAnnotations = annotations.filter(h => h.page === pageNum);
   
-  // Find the actual global index
-  let globalIndex = 0;
-  let found = false;
-  for (let i = 0; i < annotations.length; i++) {
-    if (annotations[i].page === pageNum) {
-      if (globalIndex === selectedHighlightIndex) {
-        annotations[i].note = textarea.value;
-        found = true;
-        break;
+  if (selectedHighlightIndex >= 0 && selectedHighlightIndex < pageAnnotations.length) {
+    // Find the actual index in the full array
+    let actualIndex = -1;
+    let pageCount = 0;
+    
+    for (let i = 0; i < annotations.length; i++) {
+      if (annotations[i].page === pageNum) {
+        if (pageCount === selectedHighlightIndex) {
+          actualIndex = i;
+          break;
+        }
+        pageCount++;
       }
-      globalIndex++;
+    }
+    
+    if (actualIndex !== -1) {
+      annotations[actualIndex].note = textarea.value;
+      localStorage.setItem(storeKey, JSON.stringify(annotations));
+      showToast("Note saved");
     }
   }
   
-  if (found) {
-    localStorage.setItem(storeKey, JSON.stringify(annotations));
-    showToast("Note saved");
-  }
-  
   sheet.style.bottom = "-100%";
-  viewer.querySelectorAll('.highlight.selected').forEach(h => {
-    h.classList.remove('selected');
-  });
+  if (currentPageContainer) {
+    currentPageContainer.querySelectorAll('.highlight.selected').forEach(h => {
+      h.classList.remove('selected');
+    });
+  }
   selectedHighlightIndex = -1;
 };
 
 document.getElementById("closeNote").onclick = () => {
   sheet.style.bottom = "-100%";
-  viewer.querySelectorAll('.highlight.selected').forEach(h => {
-    h.classList.remove('selected');
-  });
+  if (currentPageContainer) {
+    currentPageContainer.querySelectorAll('.highlight.selected').forEach(h => {
+      h.classList.remove('selected');
+    });
+  }
   selectedHighlightIndex = -1;
 };
 
@@ -802,7 +968,14 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Keyboard shortcuts for testing
+// Handle window resize
+window.addEventListener('resize', () => {
+  if (fitToWidth) {
+    render();
+  }
+});
+
+// Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (annotationMode) {
