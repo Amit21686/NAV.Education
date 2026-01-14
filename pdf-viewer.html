@@ -462,22 +462,42 @@ function showToast(message, duration = 2000) {
 }
 
 function calculateOptimalScale(pageWidth, pageHeight) {
-  const screenWidth = window.innerWidth - 20; // 10px padding on each side
-  const screenHeight = window.innerHeight - 100; // Account for UI elements
+  const screenWidth = window.innerWidth - 20;
+  const screenHeight = window.innerHeight - 100;
   
-  // Calculate scale to fit width
   const widthScale = screenWidth / pageWidth;
-  
-  // Calculate scale to fit height
   const heightScale = screenHeight / pageHeight;
   
-  // Use the smaller scale to ensure entire page fits
-  return Math.min(widthScale, heightScale, 2.0); // Max 2x zoom initially
+  return Math.min(widthScale, heightScale, 2.0);
 }
 
 function calculateFitToWidthScale(pageWidth) {
-  const screenWidth = window.innerWidth - 20; // 10px padding on each side
+  const screenWidth = window.innerWidth - 20;
   return screenWidth / pageWidth;
+}
+
+function getGlobalAnnotations() {
+  return JSON.parse(localStorage.getItem(storeKey) || "[]");
+}
+
+function getAnnotationsForPage(page) {
+  const annotations = getGlobalAnnotations();
+  return annotations.filter(h => h.page === page);
+}
+
+function getGlobalIndexForPageAnnotation(pageAnnotationIndex) {
+  const annotations = getGlobalAnnotations();
+  let pageCount = 0;
+  
+  for (let i = 0; i < annotations.length; i++) {
+    if (annotations[i].page === pageNum) {
+      if (pageCount === pageAnnotationIndex) {
+        return i;
+      }
+      pageCount++;
+    }
+  }
+  return -1;
 }
 
 /* ---------------- PDF INIT ---------------- */
@@ -513,12 +533,15 @@ async function render() {
     const page = await pdfDoc.getPage(pageNum);
     const defaultViewport = page.getViewport({ scale: 1.0 });
     
-    // Calculate scale based on fitToWidth setting
+    // Calculate scale
     if (fitToWidth) {
       scale = calculateFitToWidthScale(defaultViewport.width);
     } else if (scale === 1.0) {
       scale = calculateOptimalScale(defaultViewport.width, defaultViewport.height);
     }
+    
+    // Clamp scale
+    scale = Math.max(0.5, Math.min(scale, 5.0));
     
     pageViewport = page.getViewport({ scale });
     
@@ -530,28 +553,26 @@ async function render() {
     canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
     
-    // Set canvas dimensions
     canvas.width = pageViewport.width;
     canvas.height = pageViewport.height;
     
-    // Set display dimensions for proper scaling
     canvas.style.width = pageViewport.width + "px";
     canvas.style.height = pageViewport.height + "px";
     
     currentPageContainer.appendChild(canvas);
     viewer.appendChild(currentPageContainer);
     
-    // Center the page in viewer
+    // Reset scroll
     viewer.scrollTop = 0;
     viewer.scrollLeft = 0;
     
-    // Render PDF page
+    // Render PDF
     await page.render({ 
       canvasContext: context, 
       viewport: pageViewport 
     }).promise;
     
-    // Load highlights for this page
+    // Load highlights
     loadHighlights(currentPageContainer);
     
   } catch (err) {
@@ -562,6 +583,7 @@ async function render() {
 
 /* ---------------- TOUCH HANDLERS ---------------- */
 let isSwiping = false;
+let touchStartTime = 0;
 
 viewer.addEventListener("touchstart", (e) => {
   if (e.touches.length !== 1) return;
@@ -571,7 +593,9 @@ viewer.addEventListener("touchstart", (e) => {
   startY = touch.clientY;
   swipeStartX = touch.clientX;
   swipeStartY = touch.clientY;
+  touchStartTime = Date.now();
   
+  // Double tap detection
   const now = Date.now();
   const timeDiff = now - lastTapTime;
   const dist = Math.sqrt(
@@ -579,18 +603,16 @@ viewer.addEventListener("touchstart", (e) => {
     Math.pow(touch.clientY - lastTapY, 2)
   );
   
-  // Check for double tap
   if (timeDiff < DOUBLE_TAP_DELAY && dist < DOUBLE_TAP_DISTANCE) {
     e.preventDefault();
-    // Toggle between fit to width and zoom in
-    if (fitToWidth) {
-      fitToWidth = false;
-      scale = Math.min(scale * 1.5, 3.0);
-    } else {
-      scale = Math.min(scale * 1.5, 3.0);
-    }
+    // Zoom in on double tap
+    const oldFitToWidth = fitToWidth;
+    fitToWidth = false;
+    scale = Math.min(scale * 1.5, 3.0);
     render();
     showToast(`Zoom: ${Math.round(scale * 100)}%`);
+    
+    // Store tap info for next double tap
     lastTapTime = 0;
     return;
   }
@@ -598,7 +620,7 @@ viewer.addEventListener("touchstart", (e) => {
   lastTapX = touch.clientX;
   lastTapY = touch.clientY;
   
-  // Start long press timer only if not already in annotation mode
+  // Start long press timer for annotation mode
   if (!annotationMode) {
     longPressTimer = setTimeout(() => {
       annotationMode = true;
@@ -617,23 +639,20 @@ viewer.addEventListener("touchmove", (e) => {
   const dx = touch.clientX - startX;
   const dy = touch.clientY - startY;
   
-  // If moving significantly, cancel long press
+  // Cancel long press if moving
   if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
     if (longPressTimer) {
       clearTimeout(longPressTimer);
       longPressTimer = null;
     }
     
-    // Handle annotation creation
+    // Start annotation creation
     if (annotationMode && !activeHighlight) {
       activeHighlight = document.createElement("div");
       activeHighlight.className = "highlight";
       activeHighlight.style.background = currentColor;
       
-      // Get container position
       const containerRect = currentPageContainer.getBoundingClientRect();
-      
-      // Calculate relative position within container
       const relX = ((startX - containerRect.left) / containerRect.width) * 100;
       const relY = ((startY - containerRect.top) / containerRect.height) * 100;
       
@@ -645,7 +664,7 @@ viewer.addEventListener("touchmove", (e) => {
       currentPageContainer.appendChild(activeHighlight);
     }
     
-    // Update active highlight
+    // Update annotation size
     if (annotationMode && activeHighlight) {
       const containerRect = currentPageContainer.getBoundingClientRect();
       const currentX = ((touch.clientX - containerRect.left) / containerRect.width) * 100;
@@ -659,7 +678,6 @@ viewer.addEventListener("touchmove", (e) => {
       const width = Math.abs(currentX - startLeft);
       const height = Math.abs(currentY - startTop);
       
-      // Only update if highlight is reasonably sized
       if (width > 1 && height > 1) {
         Object.assign(activeHighlight.style, {
           left: left + "%",
@@ -668,7 +686,6 @@ viewer.addEventListener("touchmove", (e) => {
           height: height + "%"
         });
       }
-      e.preventDefault();
     }
     
     // Check for page swipe
@@ -682,18 +699,17 @@ viewer.addEventListener("touchend", (e) => {
   const endTime = Date.now();
   lastTapTime = endTime;
   
-  // Clear long press timer
+  // Clear timers
   if (longPressTimer) {
     clearTimeout(longPressTimer);
     longPressTimer = null;
   }
   
-  // Handle annotation finalization
+  // Finalize annotation
   if (activeHighlight) {
     const width = parseFloat(activeHighlight.style.width);
     const height = parseFloat(activeHighlight.style.height);
     
-    // Only save if highlight is big enough
     if (width > 2 && height > 2) {
       saveHighlight({
         page: pageNum,
@@ -717,15 +733,14 @@ viewer.addEventListener("touchend", (e) => {
     const dx = touch.clientX - swipeStartX;
     const screenWidth = window.innerWidth;
     
-    // Swipe threshold
-    if (Math.abs(dx) > 50) {
-      // Swipe left - next page
+    // Swipe from edge for page navigation
+    const isFromEdge = swipeStartX < 50 || swipeStartX > screenWidth - 50;
+    
+    if (Math.abs(dx) > 50 && isFromEdge) {
       if (dx < 0 && pageNum < pdfDoc.numPages) {
         pageNum++;
         render();
-      }
-      // Swipe right - previous page
-      else if (dx > 0 && pageNum > 1) {
+      } else if (dx > 0 && pageNum > 1) {
         pageNum--;
         render();
       }
@@ -761,6 +776,10 @@ zoomResetBtn.addEventListener('click', () => {
 
 fitWidthBtn.addEventListener('click', () => {
   fitToWidth = !fitToWidth;
+  fitWidthBtn.style.background = fitToWidth 
+    ? 'rgba(124, 77, 255, 0.9)' 
+    : 'rgba(17, 24, 39, 0.9)';
+  
   if (fitToWidth) {
     scale = 1.0;
     showToast("Fit to width enabled");
@@ -772,7 +791,7 @@ fitWidthBtn.addEventListener('click', () => {
 
 /* ---------------- STORAGE ---------------- */
 function saveHighlight(highlight) {
-  const annotations = JSON.parse(localStorage.getItem(storeKey) || "[]");
+  const annotations = getGlobalAnnotations();
   annotations.push(highlight);
   localStorage.setItem(storeKey, JSON.stringify(annotations));
   loadHighlights(currentPageContainer);
@@ -781,11 +800,10 @@ function saveHighlight(highlight) {
 function loadHighlights(container) {
   if (!container) return;
   
-  // Remove existing highlights
+  // Clear existing highlights
   container.querySelectorAll(".highlight").forEach(h => h.remove());
   
-  const annotations = JSON.parse(localStorage.getItem(storeKey) || "[]");
-  const pageAnnotations = annotations.filter(h => h.page === pageNum);
+  const pageAnnotations = getAnnotationsForPage(pageNum);
   
   pageAnnotations.forEach((h, index) => {
     const el = document.createElement("div");
@@ -798,31 +816,31 @@ function loadHighlights(container) {
       background: h.color
     });
     
-    // Store index for deletion
     el.dataset.index = index;
     
-    // Click to view/edit note
-    el.onclick = (e) => {
+    // Click to select and view note
+    el.addEventListener('click', (e) => {
       if (annotationMode) return;
       e.stopPropagation();
       
-      // Remove previous selection
+      // Deselect others
       container.querySelectorAll('.highlight.selected').forEach(h => {
         h.classList.remove('selected');
       });
       
-      // Select this highlight
+      // Select this
       el.classList.add('selected');
       selectedHighlightIndex = index;
       
-      // Show note sheet with existing note
+      // Show note
       textarea.value = h.note || "";
       sheet.style.bottom = "0";
-    };
+    });
     
-    // Long press to delete
+    // Long press to delete (in annotation mode)
     el.addEventListener("touchstart", (e) => {
       if (!annotationMode) return;
+      e.stopPropagation();
       
       deleteTimer = setTimeout(() => {
         showDeleteConfirmation(index);
@@ -840,31 +858,15 @@ function loadHighlights(container) {
   });
 }
 
-function deleteHighlight(index) {
-  const annotations = JSON.parse(localStorage.getItem(storeKey) || "[]");
-  const pageAnnotations = annotations.filter(h => h.page === pageNum);
+function deleteHighlight(pageAnnotationIndex) {
+  const annotations = getGlobalAnnotations();
+  const globalIndex = getGlobalIndexForPageAnnotation(pageAnnotationIndex);
   
-  if (index >= 0 && index < pageAnnotations.length) {
-    // Find the actual index in the full array
-    let actualIndex = -1;
-    let pageCount = 0;
-    
-    for (let i = 0; i < annotations.length; i++) {
-      if (annotations[i].page === pageNum) {
-        if (pageCount === index) {
-          actualIndex = i;
-          break;
-        }
-        pageCount++;
-      }
-    }
-    
-    if (actualIndex !== -1) {
-      annotations.splice(actualIndex, 1);
-      localStorage.setItem(storeKey, JSON.stringify(annotations));
-      loadHighlights(currentPageContainer);
-      showToast("Highlight deleted");
-    }
+  if (globalIndex !== -1) {
+    annotations.splice(globalIndex, 1);
+    localStorage.setItem(storeKey, JSON.stringify(annotations));
+    loadHighlights(currentPageContainer);
+    showToast("Highlight deleted");
   }
 }
 
@@ -876,53 +878,33 @@ function showDeleteConfirmation(index) {
 /* ---------------- UI CONTROLS ---------------- */
 // Color picker
 picker.querySelectorAll(".color").forEach(c => {
-  c.onclick = () => {
+  c.addEventListener('click', () => {
     currentColor = c.dataset.color;
     picker.querySelectorAll('.color').forEach(col => col.classList.remove('active'));
     c.classList.add('active');
     showToast(`Color changed`);
-  };
+  });
 });
 
 // Note sheet controls
-document.getElementById("saveNote").onclick = () => {
+document.getElementById("saveNote").addEventListener('click', () => {
   if (selectedHighlightIndex === -1) return;
   
-  const annotations = JSON.parse(localStorage.getItem(storeKey) || "[]");
-  const pageAnnotations = annotations.filter(h => h.page === pageNum);
+  const annotations = getGlobalAnnotations();
+  const globalIndex = getGlobalIndexForPageAnnotation(selectedHighlightIndex);
   
-  if (selectedHighlightIndex >= 0 && selectedHighlightIndex < pageAnnotations.length) {
-    // Find the actual index in the full array
-    let actualIndex = -1;
-    let pageCount = 0;
-    
-    for (let i = 0; i < annotations.length; i++) {
-      if (annotations[i].page === pageNum) {
-        if (pageCount === selectedHighlightIndex) {
-          actualIndex = i;
-          break;
-        }
-        pageCount++;
-      }
-    }
-    
-    if (actualIndex !== -1) {
-      annotations[actualIndex].note = textarea.value;
-      localStorage.setItem(storeKey, JSON.stringify(annotations));
-      showToast("Note saved");
-    }
+  if (globalIndex !== -1) {
+    annotations[globalIndex].note = textarea.value;
+    localStorage.setItem(storeKey, JSON.stringify(annotations));
+    showToast("Note saved");
   }
   
-  sheet.style.bottom = "-100%";
-  if (currentPageContainer) {
-    currentPageContainer.querySelectorAll('.highlight.selected').forEach(h => {
-      h.classList.remove('selected');
-    });
-  }
-  selectedHighlightIndex = -1;
-};
+  closeNoteSheet();
+});
 
-document.getElementById("closeNote").onclick = () => {
+document.getElementById("closeNote").addEventListener('click', closeNoteSheet);
+
+function closeNoteSheet() {
   sheet.style.bottom = "-100%";
   if (currentPageContainer) {
     currentPageContainer.querySelectorAll('.highlight.selected').forEach(h => {
@@ -930,24 +912,25 @@ document.getElementById("closeNote").onclick = () => {
     });
   }
   selectedHighlightIndex = -1;
-};
+}
 
 // Delete confirmation
-document.getElementById("confirmDelete").onclick = () => {
+document.getElementById("confirmDelete").addEventListener('click', () => {
   deleteHighlight(selectedHighlightIndex);
   deleteConfirm.classList.remove('show');
   selectedHighlightIndex = -1;
-};
+});
 
-document.getElementById("cancelDelete").onclick = () => {
+document.getElementById("cancelDelete").addEventListener('click', () => {
   deleteConfirm.classList.remove('show');
   selectedHighlightIndex = -1;
-};
+});
 
 // Close delete confirm on background click
 deleteConfirm.addEventListener('click', (e) => {
   if (e.target === deleteConfirm) {
     deleteConfirm.classList.remove('show');
+    selectedHighlightIndex = -1;
   }
 });
 
@@ -959,7 +942,7 @@ function updatePageIndicator() {
 }
 
 // Exit annotation mode on tap outside
-document.addEventListener('click', (e) => {
+document.addEventListener('touchstart', (e) => {
   if (annotationMode && !picker.contains(e.target)) {
     annotationMode = false;
     picker.style.display = 'none';
@@ -969,32 +952,77 @@ document.addEventListener('click', (e) => {
 });
 
 // Handle window resize
+let resizeTimer;
 window.addEventListener('resize', () => {
-  if (fitToWidth) {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
     render();
-  }
+  }, 250);
 });
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    if (annotationMode) {
-      annotationMode = false;
-      picker.style.display = 'none';
-      modeIndicator.textContent = "Mode: View";
-    }
-    sheet.style.bottom = "-100%";
-  } else if (e.key === 'ArrowRight' && pageNum < pdfDoc.numPages) {
-    pageNum++;
-    render();
-  } else if (e.key === 'ArrowLeft' && pageNum > 1) {
-    pageNum--;
-    render();
+  if (!pdfDoc) return;
+  
+  switch(e.key) {
+    case 'Escape':
+      if (annotationMode) {
+        annotationMode = false;
+        picker.style.display = 'none';
+        modeIndicator.textContent = "Mode: View";
+        showToast("Exited highlight mode");
+      }
+      closeNoteSheet();
+      break;
+      
+    case 'ArrowRight':
+      if (pageNum < pdfDoc.numPages) {
+        pageNum++;
+        render();
+      }
+      break;
+      
+    case 'ArrowLeft':
+      if (pageNum > 1) {
+        pageNum--;
+        render();
+      }
+      break;
+      
+    case '+':
+    case '=':
+      if (e.ctrlKey || e.metaKey) {
+        fitToWidth = false;
+        scale = Math.min(scale * 1.2, 5.0);
+        render();
+      }
+      break;
+      
+    case '-':
+      if (e.ctrlKey || e.metaKey) {
+        fitToWidth = false;
+        scale = Math.max(scale * 0.8, 0.5);
+        render();
+      }
+      break;
+  }
+});
+
+// Prevent context menu
+document.addEventListener('contextmenu', (e) => {
+  if (annotationMode) {
+    e.preventDefault();
   }
 });
 
 // Initialize
 updatePageIndicator();
+
+// Clean up on page unload
+window.addEventListener('beforeunload', () => {
+  if (longPressTimer) clearTimeout(longPressTimer);
+  if (deleteTimer) clearTimeout(deleteTimer);
+});
 </script>
 
 </body>
