@@ -22,6 +22,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             overflow: hidden;
             height: 100vh;
+            touch-action: none; /* Disable browser gestures */
         }
 
         .container {
@@ -35,9 +36,18 @@
             align-items: center;
         }
 
-        .canvas-container {
+        .pdf-viewport {
             position: relative;
             overflow: visible;
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .canvas-wrapper {
+            position: relative;
             transform-origin: center center;
             transition: transform 0.1s;
         }
@@ -46,6 +56,8 @@
             display: block;
             background: #ffffff;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            max-width: 100%;
+            max-height: 90vh;
             cursor: grab;
         }
 
@@ -69,7 +81,7 @@
             font-weight: 500;
             backdrop-filter: blur(10px);
             z-index: 100;
-            transition: opacity 0.3s;
+            pointer-events: none;
         }
 
         .mode-indicator {
@@ -226,25 +238,6 @@
             visibility: visible;
         }
 
-        .touch-indicator {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 60px;
-            z-index: 5;
-            opacity: 0.1;
-            background: red;
-            display: none; /* For debugging only */
-        }
-
-        .touch-indicator.left {
-            left: 0;
-        }
-
-        .touch-indicator.right {
-            right: 0;
-        }
-
         .loading {
             position: absolute;
             top: 50%;
@@ -252,19 +245,7 @@
             transform: translate(-50%, -50%);
             color: white;
             font-size: 18px;
-        }
-
-        .page-transition {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #1a1a1a;
             z-index: 50;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s;
         }
 
         .swipe-hint {
@@ -278,24 +259,49 @@
             font-size: 12px;
             color: #aaa;
             backdrop-filter: blur(10px);
+            pointer-events: none;
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .zoom-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+            pointer-events: none;
+        }
+
+        .touch-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 5;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="canvas-container" id="canvas-container">
-            <canvas id="pdf-canvas"></canvas>
+        <div class="pdf-viewport" id="pdf-viewport">
+            <div class="canvas-wrapper" id="canvas-wrapper">
+                <canvas id="pdf-canvas"></canvas>
+            </div>
         </div>
         
         <div class="page-info">Page: <span id="page-num">1</span> / <span id="page-count">1</span></div>
         <div class="mode-indicator" id="mode-indicator">Annotation Mode</div>
+        <div class="zoom-indicator" id="zoom-indicator">100%</div>
         
-        <div class="touch-indicator left"></div>
-        <div class="touch-indicator right"></div>
-        <div class="page-transition" id="page-transition"></div>
-        
+        <div class="touch-overlay" id="touch-overlay"></div>
         <div class="loading" id="loading">Loading PDF...</div>
-        <div class="swipe-hint">Swipe from edges to change pages • Double tap to reset zoom</div>
+        <div class="swipe-hint">Swipe from edges to change pages • Pinch to zoom • Double tap to reset</div>
     </div>
 
     <div class="overlay" id="overlay"></div>
@@ -316,16 +322,17 @@
                 this.pdfDoc = null;
                 this.currentPage = 1;
                 this.currentScale = 1.0;
-                this.originalScale = 1.0;
+                this.baseScale = 1.0;
                 this.renderContext = null;
                 this.canvas = document.getElementById('pdf-canvas');
                 this.ctx = this.canvas.getContext('2d');
-                this.canvasContainer = document.getElementById('canvas-container');
+                this.canvasWrapper = document.getElementById('canvas-wrapper');
+                this.pdfViewport = document.getElementById('pdf-viewport');
                 
                 this.isAnnotationMode = false;
                 this.isPinching = false;
-                this.isScrolling = false;
                 this.isEdgeSwiping = false;
+                this.isDragging = false;
                 
                 this.annotations = new Map();
                 this.currentHighlight = null;
@@ -337,6 +344,7 @@
                 this.longPressTimer = null;
                 this.pinchStartDistance = 0;
                 this.pinchStartScale = 1.0;
+                this.initialTouches = [];
                 
                 this.init();
             }
@@ -385,19 +393,21 @@
             }
 
             setupEventListeners() {
-                // Touch events on the container
-                this.canvasContainer.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
-                this.canvasContainer.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
-                this.canvasContainer.addEventListener('touchend', this.handleTouchEnd.bind(this));
+                const touchOverlay = document.getElementById('touch-overlay');
+                
+                // Touch events on the overlay
+                touchOverlay.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
+                touchOverlay.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
+                touchOverlay.addEventListener('touchend', this.handleTouchEnd.bind(this));
                 
                 // Mouse events (for desktop testing)
-                this.canvasContainer.addEventListener('mousedown', this.handleMouseDown.bind(this));
-                this.canvasContainer.addEventListener('mousemove', this.handleMouseMove.bind(this));
-                this.canvasContainer.addEventListener('mouseup', this.handleMouseUp.bind(this));
+                touchOverlay.addEventListener('mousedown', this.handleMouseDown.bind(this));
+                touchOverlay.addEventListener('mousemove', this.handleMouseMove.bind(this));
+                touchOverlay.addEventListener('mouseup', this.handleMouseUp.bind(this));
                 
                 // Double tap detection
-                this.canvas.addEventListener('touchend', this.handleTap.bind(this));
-                this.canvas.addEventListener('click', this.handleClick.bind(this));
+                touchOverlay.addEventListener('touchend', this.handleTap.bind(this));
+                touchOverlay.addEventListener('click', this.handleClick.bind(this));
                 
                 // Note sheet controls
                 document.getElementById('close-note').addEventListener('click', () => this.hideNoteSheet());
@@ -407,7 +417,7 @@
                 
                 // Handle viewport resize
                 window.addEventListener('resize', () => {
-                    this.renderPage(this.currentPage);
+                    this.handleResize();
                 });
             }
 
@@ -420,6 +430,12 @@
                     
                     const touch1 = e.touches[0];
                     const touch2 = e.touches[1];
+                    
+                    // Store initial touches for center calculation
+                    this.initialTouches = [
+                        { x: touch1.clientX, y: touch1.clientY },
+                        { x: touch2.clientX, y: touch2.clientY }
+                    ];
                     
                     this.pinchStartDistance = this.getTouchDistance(touch1, touch2);
                     this.pinchStartScale = this.currentScale;
@@ -438,16 +454,14 @@
                         clientY: touch.clientY
                     };
                     
-                    // Check if touch started in edge zone (60px from edges)
-                    const isLeftEdge = touch.clientX < 60;
-                    const isRightEdge = touch.clientX > window.innerWidth - 60;
+                    // Check if touch started in edge zone (50px from edges)
+                    const screenWidth = window.innerWidth;
+                    const isLeftEdge = touch.clientX < 50;
+                    const isRightEdge = touch.clientX > screenWidth - 50;
                     
-                    if (isLeftEdge) {
+                    if (isLeftEdge || isRightEdge) {
                         this.isEdgeSwiping = true;
-                        console.log('Left edge touch detected');
-                    } else if (isRightEdge) {
-                        this.isEdgeSwiping = true;
-                        console.log('Right edge touch detected');
+                        console.log(`${isLeftEdge ? 'Left' : 'Right'} edge touch detected`);
                     }
 
                     // Start long press timer for annotation mode
@@ -458,6 +472,8 @@
                             }
                         }, 650);
                     }
+                    
+                    e.preventDefault();
                 }
             }
 
@@ -468,14 +484,24 @@
                     const touch2 = e.touches[1];
                     const currentDistance = this.getTouchDistance(touch1, touch2);
                     
-                    const scaleChange = currentDistance / this.pinchStartDistance;
-                    this.currentScale = this.pinchStartScale * scaleChange;
-                    
-                    // Limit zoom scale
-                    this.currentScale = Math.max(0.5, Math.min(this.currentScale, 3.0));
-                    
-                    // Apply zoom transform
-                    this.canvasContainer.style.transform = `scale(${this.currentScale})`;
+                    if (this.pinchStartDistance > 0) {
+                        const scaleChange = currentDistance / this.pinchStartDistance;
+                        const newScale = this.pinchStartScale * scaleChange;
+                        
+                        // Limit zoom scale (0.5x to 3x)
+                        this.currentScale = Math.max(0.5, Math.min(newScale, 3.0));
+                        
+                        // Calculate center point between two fingers
+                        const centerX = (touch1.clientX + touch2.clientX) / 2;
+                        const centerY = (touch1.clientY + touch2.clientY) / 2;
+                        
+                        // Apply zoom transform centered on pinch point
+                        this.applyZoom(this.currentScale, centerX, centerY);
+                        
+                        // Update zoom indicator
+                        document.getElementById('zoom-indicator').textContent = 
+                            `${Math.round(this.currentScale * 100)}%`;
+                    }
                     
                     e.preventDefault();
                     return;
@@ -492,10 +518,7 @@
                         this.longPressTimer = null;
                         
                         // Handle edge swipe for page change
-                        if (this.isEdgeSwiping && Math.abs(deltaX) > 50 && Math.abs(deltaY) < 100) {
-                            // Show transition effect
-                            document.getElementById('page-transition').style.opacity = '0.7';
-                            
+                        if (this.isEdgeSwiping && Math.abs(deltaX) > 60 && Math.abs(deltaY) < 80) {
                             if (deltaX > 0) {
                                 // Swipe right from left edge - previous page
                                 console.log('Previous page swipe detected');
@@ -505,11 +528,6 @@
                                 console.log('Next page swipe detected');
                                 this.nextPage();
                             }
-                            
-                            // Hide transition effect after delay
-                            setTimeout(() => {
-                                document.getElementById('page-transition').style.opacity = '0';
-                            }, 300);
                             
                             this.isEdgeSwiping = false;
                             this.touchStart = null;
@@ -522,6 +540,8 @@
                             this.handleHighlight(touch.clientX, touch.clientY);
                         }
                     }
+                    
+                    e.preventDefault();
                 }
             }
 
@@ -531,11 +551,10 @@
                 
                 if (this.isPinching) {
                     this.isPinching = false;
-                    // When pinch ends, re-render PDF at new scale
+                    // Re-render PDF at new scale for better quality
                     setTimeout(() => {
                         this.renderPage(this.currentPage);
-                        this.canvasContainer.style.transform = 'scale(1)';
-                    }, 100);
+                    }, 50);
                 }
                 
                 if (this.isEdgeSwiping) {
@@ -547,6 +566,7 @@
                 }
                 
                 this.touchStart = null;
+                this.initialTouches = [];
             }
 
             handleMouseDown(e) {
@@ -558,12 +578,11 @@
                     clientY: e.clientY
                 };
 
-                const isLeftEdge = e.clientX < 60;
-                const isRightEdge = e.clientX > window.innerWidth - 60;
+                const isLeftEdge = e.clientX < 50;
+                const isRightEdge = e.clientX > window.innerWidth - 50;
 
                 if (isLeftEdge || isRightEdge) {
                     this.isEdgeSwiping = true;
-                    console.log('Edge swipe mode enabled via mouse');
                 }
 
                 if (!this.isEdgeSwiping) {
@@ -584,20 +603,12 @@
                         clearTimeout(this.longPressTimer);
                         this.longPressTimer = null;
 
-                        if (this.isEdgeSwiping && Math.abs(deltaX) > 50 && Math.abs(deltaY) < 100) {
-                            document.getElementById('page-transition').style.opacity = '0.7';
-                            
+                        if (this.isEdgeSwiping && Math.abs(deltaX) > 60 && Math.abs(deltaY) < 80) {
                             if (deltaX > 0) {
-                                console.log('Mouse: Previous page swipe');
                                 this.previousPage();
                             } else {
-                                console.log('Mouse: Next page swipe');
                                 this.nextPage();
                             }
-                            
-                            setTimeout(() => {
-                                document.getElementById('page-transition').style.opacity = '0';
-                            }, 300);
                             
                             this.isEdgeSwiping = false;
                             this.touchStart = null;
@@ -643,8 +654,9 @@
                 // Check if clicking on a highlight
                 if (this.isAnnotationMode) {
                     const rect = this.canvas.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
+                    const scale = this.currentScale;
+                    const x = (e.clientX - rect.left) / scale;
+                    const y = (e.clientY - rect.top) / scale;
                     
                     const highlight = this.findHighlightAt(x, y);
                     if (highlight) {
@@ -659,16 +671,29 @@
                 return Math.sqrt(dx * dx + dy * dy);
             }
 
+            applyZoom(scale, centerX, centerY) {
+                // Apply CSS transform for smooth zooming
+                this.canvasWrapper.style.transform = `scale(${scale})`;
+                
+                // Center the zoom on the pinch point
+                const rect = this.pdfViewport.getBoundingClientRect();
+                const offsetX = centerX - rect.left;
+                const offsetY = centerY - rect.top;
+                
+                // Adjust transform origin for centered zoom
+                this.canvasWrapper.style.transformOrigin = `${offsetX}px ${offsetY}px`;
+            }
+
             enterAnnotationMode() {
                 this.isAnnotationMode = true;
-                this.canvas.classList.add('annotation-mode');
+                this.canvas.style.cursor = 'crosshair';
                 document.getElementById('mode-indicator').style.display = 'block';
                 console.log('Annotation mode activated');
             }
 
             exitAnnotationMode() {
                 this.isAnnotationMode = false;
-                this.canvas.classList.remove('annotation-mode');
+                this.canvas.style.cursor = 'grab';
                 document.getElementById('mode-indicator').style.display = 'none';
                 this.currentHighlight = null;
                 this.highlightStart = null;
@@ -676,8 +701,9 @@
 
             handleHighlight(x, y) {
                 const rect = this.canvas.getBoundingClientRect();
-                const canvasX = x - rect.left;
-                const canvasY = y - rect.top;
+                const scale = this.currentScale;
+                const canvasX = (x - rect.left) / scale;
+                const canvasY = (y - rect.top) / scale;
                 
                 if (!this.highlightStart) {
                     this.highlightStart = { x: canvasX, y: canvasY };
@@ -735,10 +761,10 @@
                 
                 const highlightEl = document.createElement('div');
                 highlightEl.className = 'highlight';
-                highlightEl.style.left = `${highlight.x}px`;
-                highlightEl.style.top = `${highlight.y}px`;
-                highlightEl.style.width = `${highlight.width}px`;
-                highlightEl.style.height = `${highlight.height}px`;
+                highlightEl.style.left = `${highlight.x * this.currentScale}px`;
+                highlightEl.style.top = `${highlight.y * this.currentScale}px`;
+                highlightEl.style.width = `${highlight.width * this.currentScale}px`;
+                highlightEl.style.height = `${highlight.height * this.currentScale}px`;
                 
                 if (permanent) {
                     highlightEl.setAttribute('data-id', highlight.id);
@@ -759,7 +785,7 @@
                     });
                 }
                 
-                this.canvasContainer.appendChild(highlightEl);
+                this.canvasWrapper.appendChild(highlightEl);
             }
 
             findHighlightAt(x, y) {
@@ -781,17 +807,34 @@
                 // Calculate viewport with current scale
                 const viewport = page.getViewport({ scale: this.currentScale });
                 
+                // Calculate the maximum scale that fits the screen
+                const containerWidth = window.innerWidth * 0.95; // 95% of screen width
+                const containerHeight = window.innerHeight * 0.85; // 85% of screen height
+                
+                const scaleX = containerWidth / viewport.width;
+                const scaleY = containerHeight / viewport.height;
+                const fitScale = Math.min(scaleX, scaleY);
+                
+                // Use fit scale as base if this is first render or reset
+                if (this.baseScale === 1.0 || this.currentScale === 1.0) {
+                    this.currentScale = fitScale;
+                    this.baseScale = fitScale;
+                }
+                
+                // Recalculate viewport with actual scale
+                const actualViewport = page.getViewport({ scale: this.currentScale });
+                
                 // Set canvas dimensions
                 const dpr = window.devicePixelRatio || 1;
-                this.canvas.width = viewport.width * dpr;
-                this.canvas.height = viewport.height * dpr;
+                this.canvas.width = Math.floor(actualViewport.width * dpr);
+                this.canvas.height = Math.floor(actualViewport.height * dpr);
                 
                 // Scale canvas for display
-                this.canvas.style.width = `${viewport.width}px`;
-                this.canvas.style.height = `${viewport.height}px`;
+                this.canvas.style.width = `${actualViewport.width}px`;
+                this.canvas.style.height = `${actualViewport.height}px`;
                 
                 // Update render context
-                this.renderContext.viewport = viewport;
+                this.renderContext.viewport = actualViewport;
                 
                 // Clear canvas
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -799,16 +842,27 @@
                 // Render PDF page
                 await page.render(this.renderContext).promise;
                 
+                // Reset transform
+                this.canvasWrapper.style.transform = 'scale(1)';
+                this.canvasWrapper.style.transformOrigin = 'center center';
+                
+                // Update zoom indicator
+                document.getElementById('zoom-indicator').textContent = 
+                    `${Math.round(this.currentScale / this.baseScale * 100)}%`;
+                
                 // Restore annotations for this page
                 this.restoreAnnotations();
                 
                 // Exit annotation mode after page change
                 this.exitAnnotationMode();
                 
-                // Reset container transform
-                this.canvasContainer.style.transform = 'scale(1)';
-                
-                console.log(`Rendered page ${pageNum} at scale ${this.currentScale.toFixed(2)}`);
+                console.log(`Rendered page ${pageNum} at ${Math.round(this.currentScale / this.baseScale * 100)}%`);
+            }
+
+            handleResize() {
+                // Recalculate base scale on resize
+                this.baseScale = 1.0;
+                this.renderPage(this.currentPage);
             }
 
             nextPage() {
@@ -827,7 +881,7 @@
 
             resetZoom() {
                 console.log('Resetting zoom');
-                this.currentScale = 1.0;
+                this.currentScale = this.baseScale;
                 this.renderPage(this.currentPage);
             }
 
@@ -846,15 +900,7 @@
                 // Draw highlights for current page
                 const pageHighlights = this.annotations.get(this.currentPage) || [];
                 pageHighlights.forEach(highlight => {
-                    // Adjust highlight position based on current scale
-                    const adjustedHighlight = {
-                        ...highlight,
-                        x: highlight.x * this.currentScale,
-                        y: highlight.y * this.currentScale,
-                        width: highlight.width * this.currentScale,
-                        height: highlight.height * this.currentScale
-                    };
-                    this.drawHighlight(adjustedHighlight, true);
+                    this.drawHighlight(highlight, true);
                 });
             }
 
