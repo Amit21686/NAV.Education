@@ -1,334 +1,838 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport"
-  content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gesture PDF Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+        body {
+            background: #121212;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            touch-action: pan-x pan-y;
+        }
 
-<style>
-body {
-  margin: 0;
-  background: #0a0a14;
-  overflow: hidden;
-  user-select: none;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
-  height: 100vh;
-  width: 100vw;
-  -webkit-tap-highlight-color: transparent;
-}
+        .container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            background: #1a1a1a;
+        }
 
-#viewer {
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-  touch-action: pan-y pinch-zoom;
-  -webkit-overflow-scrolling: touch;
-}
+        #pdf-canvas {
+            display: block;
+            margin: 0 auto;
+            background: #ffffff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            cursor: grab;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-.page-container {
-  position: relative;
-  margin: auto;
-  padding: 10px 0;
-}
+        #pdf-canvas:active {
+            cursor: grabbing;
+        }
 
-canvas {
-  display: block;
-  max-width: 100%;
-  background: white;
-  border-radius: 4px;
-}
+        .annotation-mode {
+            cursor: crosshair !important;
+        }
 
-/* Highlight */
-.highlight {
-  position: absolute;
-  background: rgba(250,204,21,0.4);
-  border-radius: 4px;
-}
+        .page-info {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            transition: opacity 0.3s;
+        }
 
-.highlight.selected {
-  outline: 2px solid #7c4dff;
-}
+        .mode-indicator {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(59, 130, 246, 0.9);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            animation: pulse 2s infinite;
+        }
 
-/* UI */
-#pageIndicator, #modeIndicator {
-  position: fixed;
-  top: 15px;
-  padding: 6px 14px;
-  background: rgba(17,24,39,.9);
-  color: white;
-  border-radius: 20px;
-  font-size: 13px;
-  z-index: 10;
-}
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
 
-#pageIndicator { right: 15px; }
-#modeIndicator { left: 15px; }
+        .highlight {
+            position: absolute;
+            background: rgba(255, 235, 59, 0.4);
+            border-radius: 2px;
+            cursor: pointer;
+            transition: background 0.2s;
+            z-index: 10;
+        }
 
-/* Color Picker */
-#colorPicker {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: none;
-  gap: 12px;
-  background: rgba(17,24,39,.9);
-  padding: 12px 16px;
-  border-radius: 40px;
-  z-index: 20;
-}
+        .highlight:hover {
+            background: rgba(255, 235, 59, 0.6);
+        }
 
-.color {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 3px solid transparent;
-}
+        .note-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #2d2d2d;
+            border-radius: 24px 24px 0 0;
+            padding: 24px;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.3);
+        }
 
-.color.active { border-color: white; }
+        .note-sheet.active {
+            transform: translateY(0);
+        }
 
-/* Note Sheet */
-#noteSheet {
-  position: fixed;
-  bottom: -100%;
-  left: 0;
-  width: 100%;
-  background: #111827;
-  border-radius: 20px 20px 0 0;
-  padding: 20px;
-  transition: bottom .3s;
-  z-index: 100;
-}
+        .note-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
 
-textarea {
-  width: 100%;
-  height: 120px;
-  background: #1f2937;
-  color: white;
-  border-radius: 12px;
-  padding: 12px;
-  border: 2px solid #374151;
-}
+        .note-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #ffffff;
+        }
 
-#saveNote {
-  width: 100%;
-  margin-top: 12px;
-  padding: 14px;
-  background: #7c4dff;
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-}
+        .close-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 18px;
+            background: #3b3b3b;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-/* Toast */
-.toast {
-  position: fixed;
-  bottom: 90px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(17,24,39,.95);
-  color: white;
-  padding: 10px 20px;
-  border-radius: 12px;
-  opacity: 0;
-  transition: .3s;
-  z-index: 1000;
-}
+        .note-textarea {
+            width: 100%;
+            height: 150px;
+            background: #3b3b3b;
+            border: 2px solid #4a4a4a;
+            border-radius: 12px;
+            padding: 16px;
+            color: white;
+            font-size: 16px;
+            font-family: inherit;
+            resize: none;
+            margin-bottom: 20px;
+        }
 
-.toast.show { opacity: 1; }
+        .note-textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
 
-/* Instructions */
-#instructions {
-  position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(17,24,39,.9);
-  color: #9ca3af;
-  padding: 10px 18px;
-  border-radius: 12px;
-  font-size: 12px;
-  z-index: 10;
-}
-</style>
+        .save-btn {
+            width: 100%;
+            padding: 16px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .save-btn:hover {
+            background: #2563eb;
+        }
+
+        .delete-btn {
+            width: 100%;
+            padding: 16px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 12px;
+        }
+
+        .delete-btn:hover {
+            background: #dc2626;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            z-index: 999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .touch-zone {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 60px;
+            z-index: 5;
+        }
+
+        .touch-zone.left {
+            left: 0;
+        }
+
+        .touch-zone.right {
+            right: 0;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+        }
+    </style>
 </head>
-
 <body>
+    <div class="container">
+        <div class="page-info">Page: <span id="page-num">1</span> / <span id="page-count">1</span></div>
+        <div class="mode-indicator" id="mode-indicator" style="display: none;">Annotation Mode</div>
+        
+        <div class="touch-zone left"></div>
+        <div class="touch-zone right"></div>
+        
+        <canvas id="pdf-canvas"></canvas>
+        
+        <div class="loading" id="loading">Loading PDF...</div>
+    </div>
 
-<div id="viewer"></div>
+    <div class="overlay" id="overlay"></div>
+    
+    <div class="note-sheet" id="note-sheet">
+        <div class="note-header">
+            <div class="note-title">Note</div>
+            <button class="close-btn" id="close-note">×</button>
+        </div>
+        <textarea class="note-textarea" id="note-text" placeholder="Type your note here..."></textarea>
+        <button class="save-btn" id="save-note">Save Note</button>
+        <button class="delete-btn" id="delete-highlight">Delete Highlight</button>
+    </div>
 
-<div id="pageIndicator">Page: 1/1</div>
-<div id="modeIndicator">Mode: View</div>
+    <script>
+        class GesturePDFViewer {
+            constructor() {
+                this.pdfDoc = null;
+                this.currentPage = 1;
+                this.currentScale = 1.0;
+                this.originalScale = 1.0;
+                this.renderContext = null;
+                this.canvas = document.getElementById('pdf-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                
+                this.isAnnotationMode = false;
+                this.isPinching = false;
+                this.isScrolling = false;
+                this.isEdgeSwiping = false;
+                
+                this.annotations = new Map(); // page -> [annotations]
+                this.currentHighlight = null;
+                this.activeHighlight = null;
+                this.highlightStart = null;
+                
+                this.touchStart = null;
+                this.lastTap = 0;
+                this.longPressTimer = null;
+                
+                this.touchZoneLeft = document.querySelector('.touch-zone.left');
+                this.touchZoneRight = document.querySelector('.touch-zone.right');
+                
+                this.init();
+            }
 
-<div id="colorPicker">
-  <div class="color active" style="background:#facc15" data-color="rgba(250,204,21,0.4)"></div>
-  <div class="color" style="background:#4ade80" data-color="rgba(74,222,128,0.4)"></div>
-  <div class="color" style="background:#60a5fa" data-color="rgba(96,165,250,0.4)"></div>
-  <div class="color" style="background:#f472b6" data-color="rgba(244,114,182,0.4)"></div>
-</div>
+            async init() {
+                // For demo, using a sample PDF URL
+                // Replace with your PDF loading logic
+                const pdfUrl = 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf';
+                
+                try {
+                    document.getElementById('loading').style.display = 'block';
+                    
+                    // Load PDF
+                    const loadingTask = pdfjsLib.getDocument(pdfUrl);
+                    this.pdfDoc = await loadingTask.promise;
+                    
+                    document.getElementById('page-count').textContent = this.pdfDoc.numPages;
+                    
+                    // Setup canvas
+                    this.setupCanvas();
+                    
+                    // Load annotations
+                    this.loadAnnotations();
+                    
+                    // Render first page
+                    await this.renderPage(this.currentPage);
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    
+                    // Setup event listeners
+                    this.setupEventListeners();
+                    
+                } catch (error) {
+                    console.error('Error loading PDF:', error);
+                    document.getElementById('loading').textContent = 'Error loading PDF';
+                }
+            }
 
-<div id="instructions">
-Long press to highlight • Double tap to zoom/reset • Swipe left/right for pages
-</div>
+            setupCanvas() {
+                const container = document.querySelector('.container');
+                const dpr = window.devicePixelRatio || 1;
+                
+                this.canvas.style.width = '100%';
+                this.canvas.style.height = '100%';
+                this.canvas.style.maxWidth = '100%';
+                
+                this.renderContext = {
+                    canvasContext: this.ctx,
+                    viewport: null,
+                    transform: [dpr, 0, 0, dpr, 0, 0]
+                };
+            }
 
-<div id="noteSheet">
-  <textarea placeholder="Write note..."></textarea>
-  <button id="saveNote">Save Note</button>
-</div>
+            setupEventListeners() {
+                // Touch events
+                this.canvas.addEventListener('touchstart', this.handleTouchStart.bind(this));
+                this.canvas.addEventListener('touchmove', this.handleTouchMove.bind(this));
+                this.canvas.addEventListener('touchend', this.handleTouchEnd.bind(this));
+                
+                // Mouse events (for desktop testing)
+                this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
+                this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
+                this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+                
+                // Double tap detection
+                this.canvas.addEventListener('click', this.handleClick.bind(this));
+                
+                // Note sheet controls
+                document.getElementById('close-note').addEventListener('click', () => this.hideNoteSheet());
+                document.getElementById('save-note').addEventListener('click', () => this.saveNote());
+                document.getElementById('delete-highlight').addEventListener('click', () => this.deleteHighlight());
+                document.getElementById('overlay').addEventListener('click', () => this.hideNoteSheet());
+                
+                // Touch zones for edge detection
+                [this.touchZoneLeft, this.touchZoneRight].forEach(zone => {
+                    zone.addEventListener('touchstart', (e) => {
+                        e.stopPropagation();
+                        this.isEdgeSwiping = true;
+                    });
+                    
+                    zone.addEventListener('touchend', () => {
+                        this.isEdgeSwiping = false;
+                    });
+                });
+                
+                // Handle viewport resize
+                window.addEventListener('resize', () => {
+                    this.renderPage(this.currentPage);
+                });
+            }
 
-<div class="toast" id="toast"></div>
+            handleTouchStart(e) {
+                if (e.touches.length === 2) {
+                    // Pinch zoom start
+                    this.isPinching = true;
+                    this.isAnnotationMode = false;
+                    this.hideModeIndicator();
+                    e.preventDefault();
+                    return;
+                }
 
-<script>
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+                if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    this.touchStart = {
+                        x: touch.clientX,
+                        y: touch.clientY,
+                        time: Date.now()
+                    };
+                    
+                    // Check if touch started in edge zone
+                    const isLeftEdge = touch.clientX < 60;
+                    const isRightEdge = touch.clientX > window.innerWidth - 60;
+                    
+                    if (isLeftEdge || isRightEdge) {
+                        this.isEdgeSwiping = true;
+                    }
 
-const viewer = document.getElementById("viewer");
-const toast = document.getElementById("toast");
-const picker = document.getElementById("colorPicker");
-const sheet = document.getElementById("noteSheet");
-const textarea = sheet.querySelector("textarea");
+                    // Start long press timer for annotation mode
+                    if (!this.isPinching && !this.isEdgeSwiping) {
+                        this.longPressTimer = setTimeout(() => {
+                            if (!this.isPinching && !this.isEdgeSwiping) {
+                                this.enterAnnotationMode();
+                            }
+                        }, 650);
+                    }
+                }
+            }
 
-let pdfDoc, pageNum = 1, scale = 1, fitToWidth = true;
-let canvas, container;
-let annotationMode = false;
-let activeHighlight = null;
-let currentColor = "rgba(250,204,21,0.4)";
-let lastTapTime = 0, lastTapX = 0, lastTapY = 0;
-let startX = 0, startY = 0;
+            handleTouchMove(e) {
+                if (e.touches.length === 2 && this.isPinching) {
+                    // Handle pinch zoom
+                    e.preventDefault();
+                    return;
+                }
 
-const params = new URLSearchParams(location.search);
-const pdfUrl = params.get("file") || "demo.pdf";
-const storeKey = "ann_" + pdfUrl;
+                if (e.touches.length === 1 && this.touchStart) {
+                    const touch = e.touches[0];
+                    const deltaX = touch.clientX - this.touchStart.x;
+                    const deltaY = touch.clientY - this.touchStart.y;
+                    
+                    // Clear long press timer if movement detected
+                    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+                        clearTimeout(this.longPressTimer);
+                        this.longPressTimer = null;
+                        
+                        // Handle edge swipe for page change
+                        if (this.isEdgeSwiping && Math.abs(deltaX) > 50 && Math.abs(deltaY) < 30) {
+                            if (deltaX > 0) {
+                                // Swipe right from left edge - previous page
+                                this.previousPage();
+                            } else {
+                                // Swipe left from right edge - next page
+                                this.nextPage();
+                            }
+                            this.isEdgeSwiping = false;
+                            this.touchStart = null;
+                            e.preventDefault();
+                            return;
+                        }
+                        
+                        // Handle highlighting in annotation mode
+                        if (this.isAnnotationMode && !this.isEdgeSwiping) {
+                            this.handleHighlight(touch.clientX, touch.clientY);
+                        }
+                    }
+                }
+            }
 
-function showToast(msg) {
-  toast.textContent = msg;
-  toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 2000);
-}
+            handleTouchEnd(e) {
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+                
+                if (this.isPinching) {
+                    this.isPinching = false;
+                }
+                
+                if (this.isEdgeSwiping) {
+                    this.isEdgeSwiping = false;
+                }
+                
+                if (this.isAnnotationMode && this.currentHighlight) {
+                    // Finalize highlight
+                    this.finalizeHighlight();
+                }
+                
+                this.touchStart = null;
+            }
 
-function saveAnn(a) {
-  const d = JSON.parse(localStorage.getItem(storeKey) || "[]");
-  d.push(a);
-  localStorage.setItem(storeKey, JSON.stringify(d));
-}
+            handleMouseDown(e) {
+                this.touchStart = {
+                    x: e.clientX,
+                    y: e.clientY,
+                    time: Date.now()
+                };
 
-function loadAnn() {
-  const d = JSON.parse(localStorage.getItem(storeKey) || "[]");
-  d.filter(x => x.page === pageNum).forEach(h => {
-    const el = document.createElement("div");
-    el.className = "highlight";
-    Object.assign(el.style, h);
-    container.appendChild(el);
-  });
-}
+                const isLeftEdge = e.clientX < 60;
+                const isRightEdge = e.clientX > window.innerWidth - 60;
 
-async function render() {
-  viewer.innerHTML = "";
-  const page = await pdfDoc.getPage(pageNum);
-  const vp = page.getViewport({ scale: 1 });
+                if (isLeftEdge || isRightEdge) {
+                    this.isEdgeSwiping = true;
+                }
 
-  if (fitToWidth) scale = (window.innerWidth - 20) / vp.width;
+                if (!this.isEdgeSwiping) {
+                    this.longPressTimer = setTimeout(() => {
+                        if (!this.isEdgeSwiping) {
+                            this.enterAnnotationMode();
+                        }
+                    }, 650);
+                }
+            }
 
-  const viewport = page.getViewport({ scale });
-  container = document.createElement("div");
-  container.className = "page-container";
-  canvas = document.createElement("canvas");
+            handleMouseMove(e) {
+                if (this.touchStart) {
+                    const deltaX = e.clientX - this.touchStart.x;
+                    const deltaY = e.clientY - this.touchStart.y;
 
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  container.appendChild(canvas);
-  viewer.appendChild(container);
+                    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+                        clearTimeout(this.longPressTimer);
+                        this.longPressTimer = null;
 
-  await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-  loadAnn();
+                        if (this.isEdgeSwiping && Math.abs(deltaX) > 50 && Math.abs(deltaY) < 30) {
+                            if (deltaX > 0) {
+                                this.previousPage();
+                            } else {
+                                this.nextPage();
+                            }
+                            this.isEdgeSwiping = false;
+                            this.touchStart = null;
+                            return;
+                        }
 
-  document.getElementById("pageIndicator").textContent =
-    `Page: ${pageNum}/${pdfDoc.numPages}`;
-}
+                        if (this.isAnnotationMode && !this.isEdgeSwiping) {
+                            this.handleHighlight(e.clientX, e.clientY);
+                        }
+                    }
+                }
+            }
 
-pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
-  pdfDoc = pdf;
-  render();
-});
+            handleMouseUp() {
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+                
+                if (this.isEdgeSwiping) {
+                    this.isEdgeSwiping = false;
+                }
+                
+                if (this.isAnnotationMode && this.currentHighlight) {
+                    this.finalizeHighlight();
+                }
+                
+                this.touchStart = null;
+            }
 
-viewer.addEventListener("touchstart", e => {
-  if (e.touches.length !== 1) return;
-  const t = e.touches[0];
-  startX = t.clientX;
-  startY = t.clientY;
+            handleClick(e) {
+                const now = Date.now();
+                const timeSinceLastTap = now - this.lastTap;
+                
+                if (timeSinceLastTap < 300) {
+                    // Double tap - reset zoom
+                    this.resetZoom();
+                    e.preventDefault();
+                }
+                
+                this.lastTap = now;
+                
+                // Check if clicking on a highlight
+                if (this.isAnnotationMode) {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    
+                    const highlight = this.findHighlightAt(x, y);
+                    if (highlight) {
+                        this.showNoteSheet(highlight);
+                    }
+                }
+            }
 
-  const now = Date.now();
-  const d = Math.hypot(t.clientX - lastTapX, t.clientY - lastTapY);
+            enterAnnotationMode() {
+                this.isAnnotationMode = true;
+                this.canvas.classList.add('annotation-mode');
+                document.getElementById('mode-indicator').style.display = 'block';
+            }
 
-  if (now - lastTapTime < 300 && d < 30) {
-    fitToWidth = scale > 1.05;
-    scale = fitToWidth ? 1 : scale * 1.5;
-    render();
-    showToast(fitToWidth ? "Zoom reset" : "Zoom in");
-    lastTapTime = 0;
-    return;
-  }
+            exitAnnotationMode() {
+                this.isAnnotationMode = false;
+                this.canvas.classList.remove('annotation-mode');
+                document.getElementById('mode-indicator').style.display = 'none';
+                this.currentHighlight = null;
+                this.highlightStart = null;
+            }
 
-  lastTapTime = now;
-  lastTapX = t.clientX;
-  lastTapY = t.clientY;
+            handleHighlight(x, y) {
+                const rect = this.canvas.getBoundingClientRect();
+                const canvasX = x - rect.left;
+                const canvasY = y - rect.top;
+                
+                if (!this.highlightStart) {
+                    this.highlightStart = { x: canvasX, y: canvasY };
+                    this.currentHighlight = {
+                        x: canvasX,
+                        y: canvasY,
+                        width: 0,
+                        height: 0,
+                        page: this.currentPage
+                    };
+                } else {
+                    this.currentHighlight.width = canvasX - this.highlightStart.x;
+                    this.currentHighlight.height = canvasY - this.highlightStart.y;
+                    
+                    // Draw temporary highlight
+                    this.drawHighlight(this.currentHighlight);
+                }
+            }
 
-  setTimeout(() => {
-    annotationMode = true;
-    picker.style.display = "flex";
-    document.getElementById("modeIndicator").textContent = "Mode: Highlight";
-  }, 650);
-});
+            finalizeHighlight() {
+                if (this.currentHighlight && 
+                    Math.abs(this.currentHighlight.width) > 10 && 
+                    Math.abs(this.currentHighlight.height) > 10) {
+                    
+                    // Normalize coordinates
+                    if (this.currentHighlight.width < 0) {
+                        this.currentHighlight.x += this.currentHighlight.width;
+                        this.currentHighlight.width = Math.abs(this.currentHighlight.width);
+                    }
+                    if (this.currentHighlight.height < 0) {
+                        this.currentHighlight.y += this.currentHighlight.height;
+                        this.currentHighlight.height = Math.abs(this.currentHighlight.height);
+                    }
+                    
+                    // Add unique ID
+                    this.currentHighlight.id = Date.now().toString();
+                    
+                    // Save highlight
+                    this.saveHighlight(this.currentHighlight);
+                    
+                    // Draw permanent highlight
+                    this.drawHighlight(this.currentHighlight, true);
+                }
+                
+                this.currentHighlight = null;
+                this.highlightStart = null;
+            }
 
-viewer.addEventListener("touchmove", e => {
-  if (!annotationMode || e.touches.length !== 1) return;
-  if (!activeHighlight) {
-    activeHighlight = document.createElement("div");
-    activeHighlight.className = "highlight";
-    activeHighlight.style.background = currentColor;
-    activeHighlight.style.left = startX + "px";
-    activeHighlight.style.top = startY + "px";
-    container.appendChild(activeHighlight);
-  }
-});
+            drawHighlight(highlight, permanent = false) {
+                if (!permanent) {
+                    // Clear temporary highlights
+                    const tempHighlights = document.querySelectorAll('.highlight:not([data-permanent])');
+                    tempHighlights.forEach(el => el.remove());
+                }
+                
+                const highlightEl = document.createElement('div');
+                highlightEl.className = 'highlight';
+                highlightEl.style.left = `${highlight.x}px`;
+                highlightEl.style.top = `${highlight.y}px`;
+                highlightEl.style.width = `${highlight.width}px`;
+                highlightEl.style.height = `${highlight.height}px`;
+                
+                if (permanent) {
+                    highlightEl.setAttribute('data-id', highlight.id);
+                    highlightEl.setAttribute('data-permanent', 'true');
+                    
+                    highlightEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (this.isAnnotationMode) {
+                            this.showNoteSheet(highlight);
+                        }
+                    });
+                    
+                    highlightEl.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        if (this.isAnnotationMode) {
+                            this.deleteHighlight(highlight.id);
+                        }
+                    });
+                }
+                
+                document.querySelector('.container').appendChild(highlightEl);
+            }
 
-viewer.addEventListener("touchend", e => {
-  if (activeHighlight) {
-    saveAnn({
-      page: pageNum,
-      left: activeHighlight.style.left,
-      top: activeHighlight.style.top,
-      width: "60px",
-      height: "25px",
-      background: currentColor
-    });
-    activeHighlight = null;
-    annotationMode = false;
-    picker.style.display = "none";
-    document.getElementById("modeIndicator").textContent = "Mode: View";
-  }
+            findHighlightAt(x, y) {
+                const highlights = this.annotations.get(this.currentPage) || [];
+                return highlights.find(h => 
+                    x >= h.x && x <= h.x + h.width &&
+                    y >= h.y && y <= h.y + h.height
+                );
+            }
 
-  const dx = e.changedTouches[0].clientX - startX;
-  const dy = e.changedTouches[0].clientY - startY;
+            async renderPage(pageNum) {
+                if (!this.pdfDoc || pageNum < 1 || pageNum > this.pdfDoc.numPages) return;
+                
+                this.currentPage = pageNum;
+                document.getElementById('page-num').textContent = pageNum;
+                
+                const page = await this.pdfDoc.getPage(pageNum);
+                
+                // Calculate viewport
+                const viewport = page.getViewport({ scale: this.currentScale });
+                
+                // Set canvas dimensions
+                const dpr = window.devicePixelRatio || 1;
+                this.canvas.width = viewport.width * dpr;
+                this.canvas.height = viewport.height * dpr;
+                
+                // Scale canvas for display
+                this.canvas.style.width = `${viewport.width}px`;
+                this.canvas.style.height = `${viewport.height}px`;
+                
+                // Update render context
+                this.renderContext.viewport = viewport;
+                
+                // Render PDF page
+                await page.render(this.renderContext).promise;
+                
+                // Restore annotations for this page
+                this.restoreAnnotations();
+                
+                // Exit annotation mode after page change
+                this.exitAnnotationMode();
+            }
 
-  if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy)) {
-    if (dx < 0 && pageNum < pdfDoc.numPages) pageNum++;
-    if (dx > 0 && pageNum > 1) pageNum--;
-    render();
-  }
-});
+            nextPage() {
+                if (this.currentPage < this.pdfDoc.numPages && !this.isAnnotationMode) {
+                    this.renderPage(this.currentPage + 1);
+                }
+            }
 
-picker.querySelectorAll(".color").forEach(c => {
-  c.onclick = () => {
-    currentColor = c.dataset.color;
-    picker.querySelectorAll(".color").forEach(x => x.classList.remove("active"));
-    c.classList.add("active");
-  };
-});
-</script>
+            previousPage() {
+                if (this.currentPage > 1 && !this.isAnnotationMode) {
+                    this.renderPage(this.currentPage - 1);
+                }
+            }
 
+            resetZoom() {
+                this.currentScale = this.originalScale;
+                this.renderPage(this.currentPage);
+            }
+
+            saveHighlight(highlight) {
+                const pageHighlights = this.annotations.get(highlight.page) || [];
+                pageHighlights.push(highlight);
+                this.annotations.set(highlight.page, pageHighlights);
+                
+                this.saveToStorage();
+            }
+
+            restoreAnnotations() {
+                // Remove all existing highlights
+                document.querySelectorAll('.highlight[data-permanent]').forEach(el => el.remove());
+                
+                // Draw highlights for current page
+                const pageHighlights = this.annotations.get(this.currentPage) || [];
+                pageHighlights.forEach(highlight => {
+                    this.drawHighlight(highlight, true);
+                });
+            }
+
+            showNoteSheet(highlight) {
+                this.activeHighlight = highlight;
+                
+                const noteSheet = document.getElementById('note-sheet');
+                const overlay = document.getElementById('overlay');
+                const noteText = document.getElementById('note-text');
+                
+                // Load existing note
+                noteText.value = highlight.note || '';
+                
+                noteSheet.classList.add('active');
+                overlay.classList.add('active');
+            }
+
+            hideNoteSheet() {
+                const noteSheet = document.getElementById('note-sheet');
+                const overlay = document.getElementById('overlay');
+                
+                noteSheet.classList.remove('active');
+                overlay.classList.remove('active');
+                
+                this.activeHighlight = null;
+            }
+
+            saveNote() {
+                if (!this.activeHighlight) return;
+                
+                const noteText = document.getElementById('note-text').value;
+                this.activeHighlight.note = noteText;
+                
+                // Update in annotations
+                const pageHighlights = this.annotations.get(this.activeHighlight.page) || [];
+                const index = pageHighlights.findIndex(h => h.id === this.activeHighlight.id);
+                if (index !== -1) {
+                    pageHighlights[index].note = noteText;
+                    this.saveToStorage();
+                }
+                
+                this.hideNoteSheet();
+            }
+
+            deleteHighlight(highlightId = null) {
+                const id = highlightId || (this.activeHighlight && this.activeHighlight.id);
+                if (!id) return;
+                
+                // Remove from DOM
+                const highlightEl = document.querySelector(`.highlight[data-id="${id}"]`);
+                if (highlightEl) {
+                    highlightEl.remove();
+                }
+                
+                // Remove from annotations
+                const pageHighlights = this.annotations.get(this.currentPage) || [];
+                const filtered = pageHighlights.filter(h => h.id !== id);
+                this.annotations.set(this.currentPage, filtered);
+                
+                this.saveToStorage();
+                this.hideNoteSheet();
+            }
+
+            saveToStorage() {
+                const data = Object.fromEntries(this.annotations);
+                localStorage.setItem('pdfAnnotations', JSON.stringify(data));
+            }
+
+            loadAnnotations() {
+                const saved = localStorage.getItem('pdfAnnotations');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    this.annotations = new Map(Object.entries(data));
+                }
+            }
+
+            hideModeIndicator() {
+                document.getElementById('mode-indicator').style.display = 'none';
+            }
+        }
+
+        // Initialize the viewer when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new GesturePDFViewer();
+        });
+    </script>
 </body>
 </html>
