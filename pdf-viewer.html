@@ -22,7 +22,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             overflow: hidden;
             height: 100vh;
-            touch-action: none; /* Disable all browser gestures */
+            touch-action: none;
         }
 
         .container {
@@ -94,18 +94,36 @@
             100% { opacity: 0.7; }
         }
 
-        .highlight {
+        .annotation {
             position: absolute;
-            background: rgba(255, 235, 59, 0.4);
-            border-radius: 2px;
-            cursor: pointer;
-            transition: background 0.2s;
-            z-index: 10;
             pointer-events: auto;
+            cursor: pointer;
+            z-index: 10;
         }
 
-        .highlight:hover {
-            background: rgba(255, 235, 59, 0.6);
+        .highlight {
+            border-radius: 2px;
+        }
+
+        .rectangle {
+            border: 2px solid;
+            background: transparent;
+        }
+
+        .line {
+            background: transparent;
+            overflow: visible;
+        }
+
+        .line::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-top: 2px solid;
+            transform-origin: 0 0;
         }
 
         .note-sheet {
@@ -248,6 +266,69 @@
             pointer-events: none;
         }
 
+        .annotation-toolbar {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 12px;
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+            display: none;
+        }
+
+        .annotation-toolbar.active {
+            display: flex;
+        }
+
+        .tool-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            border: none;
+            background: #333;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.2s;
+        }
+
+        .tool-btn.active {
+            background: #3b82f6;
+            transform: scale(1.1);
+        }
+
+        .tool-btn:hover {
+            background: #444;
+        }
+
+        .color-picker {
+            display: flex;
+            gap: 6px;
+            margin-left: 8px;
+        }
+
+        .color-option {
+            width: 32px;
+            height: 32px;
+            border-radius: 16px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .color-option.active {
+            border-color: white;
+            transform: scale(1.1);
+        }
+
         .swipe-hint {
             position: fixed;
             bottom: 30px;
@@ -265,15 +346,16 @@
             max-width: 400px;
         }
 
-        .debug {
+        .shape-indicator {
             position: fixed;
-            bottom: 100px;
+            top: 60px;
             left: 20px;
-            background: rgba(0, 0, 0, 0.5);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 500;
             display: none;
         }
     </style>
@@ -286,11 +368,24 @@
         
         <div class="page-info">Page: <span id="page-num">1</span> / <span id="page-count">1</span></div>
         <div class="mode-indicator" id="mode-indicator">Annotation Mode</div>
+        <div class="shape-indicator" id="shape-indicator">Highlight</div>
         <div class="zoom-indicator" id="zoom-indicator">100%</div>
         
+        <div class="annotation-toolbar" id="annotation-toolbar">
+            <button class="tool-btn active" id="tool-highlight" title="Highlight">H</button>
+            <button class="tool-btn" id="tool-rectangle" title="Rectangle">□</button>
+            <button class="tool-btn" id="tool-line" title="Line">─</button>
+            <div class="color-picker">
+                <div class="color-option active" style="background: rgba(255, 235, 59, 0.4);" data-color="rgba(255, 235, 59, 0.4)" data-border="#ffeb3b"></div>
+                <div class="color-option" style="background: rgba(33, 150, 243, 0.4);" data-color="rgba(33, 150, 243, 0.4)" data-border="#2196f3"></div>
+                <div class="color-option" style="background: rgba(76, 175, 80, 0.4);" data-color="rgba(76, 175, 80, 0.4)" data-border="#4caf50"></div>
+                <div class="color-option" style="background: rgba(244, 67, 54, 0.4);" data-color="rgba(244, 67, 54, 0.4)" data-border="#f44336"></div>
+                <div class="color-option" style="background: rgba(156, 39, 176, 0.4);" data-color="rgba(156, 39, 176, 0.4)" data-border="#9c27b0"></div>
+            </div>
+        </div>
+        
         <div class="loading" id="loading">Loading PDF...</div>
-        <div class="swipe-hint">Swipe from edges to change pages • Pinch to zoom • Pan after zoom • Double tap to reset</div>
-        <div class="debug" id="debug"></div>
+        <div class="swipe-hint">Long press to annotate • Pinch to zoom • Pan after zoom • Double tap to reset</div>
     </div>
 
     <div class="overlay" id="overlay"></div>
@@ -302,7 +397,7 @@
         </div>
         <textarea class="note-textarea" id="note-text" placeholder="Type your note here..."></textarea>
         <button class="save-btn" id="save-note">Save Note</button>
-        <button class="delete-btn" id="delete-highlight">Delete Highlight</button>
+        <button class="delete-btn" id="delete-highlight">Delete Annotation</button>
     </div>
 
     <script>
@@ -310,10 +405,10 @@
             constructor() {
                 this.pdfDoc = null;
                 this.currentPage = 1;
+                this.baseScale = 1.0;
                 this.currentScale = 1.0;
                 this.minScale = 0.5;
                 this.maxScale = 3.0;
-                this.baseScale = 1.0;
                 
                 this.renderContext = null;
                 this.canvas = document.getElementById('pdf-canvas');
@@ -337,6 +432,7 @@
                 this.isPinching = false;
                 this.isPanning = false;
                 this.isEdgeSwiping = false;
+                this.isDrawing = false;
                 
                 // Touch state
                 this.touchStart = null;
@@ -352,13 +448,15 @@
                 // Pan state
                 this.panStart = { x: 0, y: 0 };
                 this.velocity = { x: 0, y: 0 };
-                this.lastTouchTime = 0;
                 
-                // Annotations
+                // Annotation state
                 this.annotations = new Map();
-                this.currentHighlight = null;
-                this.activeHighlight = null;
-                this.highlightStart = null;
+                this.currentAnnotation = null;
+                this.activeAnnotation = null;
+                this.annotationStart = null;
+                this.annotationType = 'highlight'; // highlight, rectangle, line
+                this.annotationColor = 'rgba(255, 235, 59, 0.4)';
+                this.borderColor = '#ffeb3b';
                 
                 this.init();
             }
@@ -422,13 +520,27 @@
                 
                 // Double tap detection
                 this.mainContainer.addEventListener('touchend', this.handleTap.bind(this));
-                this.mainContainer.addEventListener('click', this.handleClick.bind(this));
                 
                 // Note sheet controls
                 document.getElementById('close-note').addEventListener('click', () => this.hideNoteSheet());
                 document.getElementById('save-note').addEventListener('click', () => this.saveNote());
-                document.getElementById('delete-highlight').addEventListener('click', () => this.deleteHighlight());
+                document.getElementById('delete-highlight').addEventListener('click', () => this.deleteAnnotation());
                 document.getElementById('overlay').addEventListener('click', () => this.hideNoteSheet());
+                
+                // Annotation toolbar
+                document.getElementById('tool-highlight').addEventListener('click', () => this.setAnnotationType('highlight'));
+                document.getElementById('tool-rectangle').addEventListener('click', () => this.setAnnotationType('rectangle'));
+                document.getElementById('tool-line').addEventListener('click', () => this.setAnnotationType('line'));
+                
+                // Color picker
+                document.querySelectorAll('.color-option').forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.annotationColor = e.target.dataset.color;
+                        this.borderColor = e.target.dataset.border;
+                    });
+                });
                 
                 // Handle viewport resize
                 window.addEventListener('resize', () => {
@@ -443,18 +555,17 @@
                     // PINCH ZOOM START
                     this.isPinching = true;
                     this.isAnnotationMode = false;
+                    this.hideAnnotationToolbar();
                     document.getElementById('mode-indicator').style.display = 'none';
                     
                     const touch1 = e.touches[0];
                     const touch2 = e.touches[1];
                     
-                    // Calculate initial pinch center and distance
                     this.pinchCenter = this.getTouchCenter(touch1, touch2);
                     this.lastPinchCenter = { ...this.pinchCenter };
                     this.pinchStartDistance = this.getTouchDistance(touch1, touch2);
                     this.pinchStartScale = this.transform.scale;
                     
-                    // Store touches for movement
                     this.touchStart = {
                         x: this.pinchCenter.x,
                         y: this.pinchCenter.y,
@@ -469,18 +580,21 @@
 
                 if (e.touches.length === 1) {
                     const touch = e.touches[0];
+                    const screenX = touch.clientX;
+                    const screenY = touch.clientY;
+                    
                     this.touchStart = {
-                        x: touch.clientX,
-                        y: touch.clientY,
+                        x: screenX,
+                        y: screenY,
                         time: Date.now(),
-                        clientX: touch.clientX,
-                        clientY: touch.clientY
+                        clientX: screenX,
+                        clientY: screenY
                     };
                     
                     // Check if touch started in edge zone (50px from edges)
                     const screenWidth = window.innerWidth;
-                    const isLeftEdge = touch.clientX < 50;
-                    const isRightEdge = touch.clientX > screenWidth - 50;
+                    const isLeftEdge = screenX < 50;
+                    const isRightEdge = screenX > screenWidth - 50;
                     
                     if (isLeftEdge || isRightEdge) {
                         this.isEdgeSwiping = true;
@@ -490,7 +604,7 @@
                     if (!this.isPinching && !this.isEdgeSwiping) {
                         this.longPressTimer = setTimeout(() => {
                             if (!this.isPinching && !this.isEdgeSwiping) {
-                                this.enterAnnotationMode();
+                                this.enterAnnotationMode(screenX, screenY);
                             }
                         }, 650);
                     }
@@ -507,31 +621,20 @@
                     const currentDistance = this.getTouchDistance(touch1, touch2);
                     
                     if (this.pinchStartDistance > 0) {
-                        // Calculate scale change
                         const scaleChange = currentDistance / this.pinchStartDistance;
                         const newScale = this.pinchStartScale * scaleChange;
                         
-                        // Apply scale limits
                         this.transform.scale = Math.max(this.minScale, Math.min(newScale, this.maxScale));
                         
-                        // Calculate current pinch center
                         const currentCenter = this.getTouchCenter(touch1, touch2);
-                        
-                        // Calculate how much the center moved since last frame
                         const centerDeltaX = currentCenter.x - this.lastPinchCenter.x;
                         const centerDeltaY = currentCenter.y - this.lastPinchCenter.y;
                         
-                        // Update pan position based on center movement
                         this.transform.x += centerDeltaX;
                         this.transform.y += centerDeltaY;
                         
-                        // Update last pinch center
                         this.lastPinchCenter = currentCenter;
-                        
-                        // Update zoom indicator
                         this.updateZoomIndicator();
-                        
-                        // Apply transform immediately
                         this.applyTransform();
                     }
                     return;
@@ -539,10 +642,12 @@
 
                 if (e.touches.length === 1 && this.touchStart && !this.isPinching) {
                     const touch = e.touches[0];
-                    const deltaX = touch.clientX - this.touchStart.x;
-                    const deltaY = touch.clientY - this.touchStart.y;
+                    const screenX = touch.clientX;
+                    const screenY = touch.clientY;
                     
-                    // Clear long press timer if movement detected
+                    const deltaX = screenX - this.touchStart.x;
+                    const deltaY = screenY - this.touchStart.y;
+                    
                     if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
                         clearTimeout(this.longPressTimer);
                         this.longPressTimer = null;
@@ -550,10 +655,8 @@
                         // Handle edge swipe for page change
                         if (this.isEdgeSwiping && Math.abs(deltaX) > 60 && Math.abs(deltaY) < 80) {
                             if (deltaX > 0) {
-                                // Swipe right from left edge - previous page
                                 this.previousPage();
                             } else {
-                                // Swipe left from right edge - next page
                                 this.nextPage();
                             }
                             
@@ -568,20 +671,15 @@
                             this.transform.x += deltaX;
                             this.transform.y += deltaY;
                             
-                            // Apply constraints to prevent panning beyond edges
                             this.constrainPan();
-                            
-                            // Update touch start for next movement
-                            this.touchStart.x = touch.clientX;
-                            this.touchStart.y = touch.clientY;
-                            
-                            // Apply transform
+                            this.touchStart.x = screenX;
+                            this.touchStart.y = screenY;
                             this.applyTransform();
                         }
                         
-                        // Handle highlighting in annotation mode
+                        // Handle annotation drawing
                         if (this.isAnnotationMode && !this.isEdgeSwiping) {
-                            this.handleHighlight(touch.clientX, touch.clientY);
+                            this.handleAnnotation(screenX, screenY);
                         }
                     }
                 }
@@ -595,7 +693,6 @@
                 
                 if (this.isPinching) {
                     this.isPinching = false;
-                    // Reset pinch state
                     this.pinchStartDistance = 0;
                     this.pinchStartScale = 1;
                 }
@@ -607,7 +704,6 @@
                 if (this.isPanning) {
                     this.isPanning = false;
                     
-                    // Calculate velocity for momentum scrolling
                     if (this.touchStart) {
                         const now = Date.now();
                         const timeDiff = now - this.touchStart.time;
@@ -623,24 +719,27 @@
                     }
                 }
                 
-                if (this.isAnnotationMode && this.currentHighlight) {
-                    this.finalizeHighlight();
+                if (this.isAnnotationMode && this.currentAnnotation) {
+                    this.finalizeAnnotation();
                 }
                 
                 this.touchStart = null;
             }
 
             handleMouseDown(e) {
+                const screenX = e.clientX;
+                const screenY = e.clientY;
+                
                 this.touchStart = {
-                    x: e.clientX,
-                    y: e.clientY,
+                    x: screenX,
+                    y: screenY,
                     time: Date.now(),
-                    clientX: e.clientX,
-                    clientY: e.clientY
+                    clientX: screenX,
+                    clientY: screenY
                 };
 
-                const isLeftEdge = e.clientX < 50;
-                const isRightEdge = e.clientX > window.innerWidth - 50;
+                const isLeftEdge = screenX < 50;
+                const isRightEdge = screenX > window.innerWidth - 50;
 
                 if (isLeftEdge || isRightEdge) {
                     this.isEdgeSwiping = true;
@@ -649,7 +748,7 @@
                 if (!this.isEdgeSwiping) {
                     this.longPressTimer = setTimeout(() => {
                         if (!this.isEdgeSwiping) {
-                            this.enterAnnotationMode();
+                            this.enterAnnotationMode(screenX, screenY);
                         }
                     }, 650);
                 }
@@ -657,8 +756,11 @@
 
             handleMouseMove(e) {
                 if (this.touchStart) {
-                    const deltaX = e.clientX - this.touchStart.x;
-                    const deltaY = e.clientY - this.touchStart.y;
+                    const screenX = e.clientX;
+                    const screenY = e.clientY;
+                    
+                    const deltaX = screenX - this.touchStart.x;
+                    const deltaY = screenY - this.touchStart.y;
 
                     if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
                         clearTimeout(this.longPressTimer);
@@ -676,21 +778,18 @@
                             return;
                         }
 
-                        // Handle mouse panning (with Ctrl key for testing)
                         if ((e.ctrlKey || this.transform.scale > this.baseScale) && !this.isAnnotationMode) {
                             this.transform.x += deltaX;
                             this.transform.y += deltaY;
                             
                             this.constrainPan();
-                            
-                            this.touchStart.x = e.clientX;
-                            this.touchStart.y = e.clientY;
-                            
+                            this.touchStart.x = screenX;
+                            this.touchStart.y = screenY;
                             this.applyTransform();
                         }
 
                         if (this.isAnnotationMode && !this.isEdgeSwiping) {
-                            this.handleHighlight(e.clientX, e.clientY);
+                            this.handleAnnotation(screenX, screenY);
                         }
                     }
                 }
@@ -704,15 +803,14 @@
                     this.isEdgeSwiping = false;
                 }
                 
-                if (this.isAnnotationMode && this.currentHighlight) {
-                    this.finalizeHighlight();
+                if (this.isAnnotationMode && this.currentAnnotation) {
+                    this.finalizeAnnotation();
                 }
                 
                 this.touchStart = null;
             }
 
             handleWheel(e) {
-                // For desktop testing: Ctrl+Wheel to zoom
                 if (e.ctrlKey) {
                     e.preventDefault();
                     
@@ -725,14 +823,10 @@
                     const newScale = Math.max(this.minScale, Math.min(oldScale * zoomFactor, this.maxScale));
                     
                     if (newScale !== oldScale) {
-                        // Calculate the point under the cursor in PDF coordinates
                         const pdfX = (x - this.transform.x) / oldScale;
                         const pdfY = (y - this.transform.y) / oldScale;
                         
-                        // Apply new scale
                         this.transform.scale = newScale;
-                        
-                        // Adjust position to keep the point under cursor
                         this.transform.x = x - pdfX * newScale;
                         this.transform.y = y - pdfY * newScale;
                         
@@ -748,27 +842,11 @@
                 const timeSinceLastTap = now - this.lastTap;
                 
                 if (timeSinceLastTap < 300) {
-                    // Double tap - reset zoom and position
                     this.resetZoom();
                     e.preventDefault();
                 }
                 
                 this.lastTap = now;
-            }
-
-            handleClick(e) {
-                // Check if clicking on a highlight
-                if (this.isAnnotationMode) {
-                    const rect = this.canvas.getBoundingClientRect();
-                    const scale = this.transform.scale;
-                    const x = (e.clientX - this.transform.x - rect.left) / scale;
-                    const y = (e.clientY - this.transform.y - rect.top) / scale;
-                    
-                    const highlight = this.findHighlightAt(x, y);
-                    if (highlight) {
-                        this.showNoteSheet(highlight);
-                    }
-                }
             }
 
             getTouchCenter(touch1, touch2) {
@@ -782,6 +860,18 @@
                 const dx = touch1.clientX - touch2.clientX;
                 const dy = touch1.clientY - touch2.clientY;
                 return Math.sqrt(dx * dx + dy * dy);
+            }
+
+            screenToCanvasCoordinates(screenX, screenY) {
+                const rect = this.canvas.getBoundingClientRect();
+                const canvasLeft = rect.left + this.transform.x;
+                const canvasTop = rect.top + this.transform.y;
+                const scale = this.transform.scale;
+                
+                return {
+                    x: (screenX - canvasLeft) / scale,
+                    y: (screenY - canvasTop) / scale
+                };
             }
 
             applyTransform() {
@@ -798,11 +888,9 @@
                 const scaledWidth = canvasRect.width * this.transform.scale;
                 const scaledHeight = canvasRect.height * this.transform.scale;
                 
-                // Calculate maximum allowed pan
                 const maxX = Math.max(0, (scaledWidth - containerRect.width) / 2);
                 const maxY = Math.max(0, (scaledHeight - containerRect.height) / 2);
                 
-                // Constrain pan to keep PDF within view
                 this.transform.x = Math.max(-maxX, Math.min(maxX, this.transform.x));
                 this.transform.y = Math.max(-maxY, Math.min(maxY, this.transform.y));
             }
@@ -814,22 +902,15 @@
                 const deltaTime = Math.min(now - this.lastFrameTime, 100) / 16;
                 this.lastFrameTime = now;
                 
-                // Apply momentum if panning ended with velocity
                 if (!this.isPanning && !this.isPinching && (Math.abs(this.velocity.x) > 0.1 || Math.abs(this.velocity.y) > 0.1)) {
                     this.transform.x += this.velocity.x * deltaTime;
                     this.transform.y += this.velocity.y * deltaTime;
                     
-                    // Apply constraints
                     this.constrainPan();
-                    
-                    // Apply damping
                     this.velocity.x *= 0.9;
                     this.velocity.y *= 0.9;
-                    
-                    // Apply transform
                     this.applyTransform();
                     
-                    // Stop if velocity is very small
                     if (Math.abs(this.velocity.x) < 0.1 && Math.abs(this.velocity.y) < 0.1) {
                         this.velocity.x = 0;
                         this.velocity.y = 0;
@@ -837,116 +918,166 @@
                 }
             }
 
-            enterAnnotationMode() {
+            enterAnnotationMode(screenX, screenY) {
                 this.isAnnotationMode = true;
                 this.canvas.style.cursor = 'crosshair';
                 document.getElementById('mode-indicator').style.display = 'block';
+                document.getElementById('annotation-toolbar').classList.add('active');
+                document.getElementById('shape-indicator').style.display = 'block';
+                this.updateShapeIndicator();
+                
+                // Store starting point for annotation
+                const canvasCoords = this.screenToCanvasCoordinates(screenX, screenY);
+                this.annotationStart = canvasCoords;
             }
 
             exitAnnotationMode() {
                 this.isAnnotationMode = false;
                 this.canvas.style.cursor = 'grab';
                 document.getElementById('mode-indicator').style.display = 'none';
-                this.currentHighlight = null;
-                this.highlightStart = null;
+                document.getElementById('annotation-toolbar').classList.remove('active');
+                document.getElementById('shape-indicator').style.display = 'none';
+                this.currentAnnotation = null;
+                this.annotationStart = null;
             }
 
-            handleHighlight(x, y) {
-                const rect = this.canvas.getBoundingClientRect();
-                const scale = this.transform.scale;
-                const canvasX = (x - this.transform.x - rect.left) / scale;
-                const canvasY = (y - this.transform.y - rect.top) / scale;
+            setAnnotationType(type) {
+                this.annotationType = type;
                 
-                if (!this.highlightStart) {
-                    this.highlightStart = { x: canvasX, y: canvasY };
-                    this.currentHighlight = {
-                        x: canvasX,
-                        y: canvasY,
-                        width: 0,
-                        height: 0,
-                        page: this.currentPage
-                    };
-                } else {
-                    this.currentHighlight.width = canvasX - this.highlightStart.x;
-                    this.currentHighlight.height = canvasY - this.highlightStart.y;
-                    
-                    // Draw temporary highlight
-                    this.drawHighlight(this.currentHighlight);
+                // Update toolbar buttons
+                document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+                document.getElementById(`tool-${type}`).classList.add('active');
+                
+                this.updateShapeIndicator();
+            }
+
+            updateShapeIndicator() {
+                const indicator = document.getElementById('shape-indicator');
+                const typeNames = {
+                    'highlight': 'Highlight',
+                    'rectangle': 'Rectangle',
+                    'line': 'Line'
+                };
+                indicator.textContent = typeNames[this.annotationType];
+                
+                // Update indicator color based on selected color
+                const colorOption = document.querySelector('.color-option.active');
+                if (colorOption) {
+                    indicator.style.color = colorOption.dataset.border;
+                    indicator.style.background = colorOption.dataset.color.replace('0.4', '0.2');
                 }
             }
 
-            finalizeHighlight() {
-                if (this.currentHighlight && 
-                    Math.abs(this.currentHighlight.width) > 10 && 
-                    Math.abs(this.currentHighlight.height) > 10) {
+            hideAnnotationToolbar() {
+                document.getElementById('annotation-toolbar').classList.remove('active');
+                document.getElementById('shape-indicator').style.display = 'none';
+            }
+
+            handleAnnotation(screenX, screenY) {
+                if (!this.annotationStart) return;
+                
+                const canvasCoords = this.screenToCanvasCoordinates(screenX, screenY);
+                
+                this.currentAnnotation = {
+                    type: this.annotationType,
+                    color: this.annotationColor,
+                    borderColor: this.borderColor,
+                    x: this.annotationStart.x,
+                    y: this.annotationStart.y,
+                    width: canvasCoords.x - this.annotationStart.x,
+                    height: canvasCoords.y - this.annotationStart.y,
+                    page: this.currentPage
+                };
+                
+                this.drawAnnotation(this.currentAnnotation);
+            }
+
+            finalizeAnnotation() {
+                if (this.currentAnnotation && 
+                    Math.abs(this.currentAnnotation.width) > 5 && 
+                    Math.abs(this.currentAnnotation.height) > 5) {
                     
                     // Normalize coordinates
-                    if (this.currentHighlight.width < 0) {
-                        this.currentHighlight.x += this.currentHighlight.width;
-                        this.currentHighlight.width = Math.abs(this.currentHighlight.width);
+                    if (this.currentAnnotation.width < 0) {
+                        this.currentAnnotation.x += this.currentAnnotation.width;
+                        this.currentAnnotation.width = Math.abs(this.currentAnnotation.width);
                     }
-                    if (this.currentHighlight.height < 0) {
-                        this.currentHighlight.y += this.currentHighlight.height;
-                        this.currentHighlight.height = Math.abs(this.currentHighlight.height);
+                    if (this.currentAnnotation.height < 0) {
+                        this.currentAnnotation.y += this.currentAnnotation.height;
+                        this.currentAnnotation.height = Math.abs(this.currentAnnotation.height);
                     }
                     
-                    // Add unique ID
-                    this.currentHighlight.id = Date.now().toString();
+                    // For lines, ensure minimum dimensions
+                    if (this.currentAnnotation.type === 'line') {
+                        if (Math.abs(this.currentAnnotation.width) < 20) {
+                            this.currentAnnotation.width = 20 * Math.sign(this.currentAnnotation.width || 1);
+                        }
+                        if (Math.abs(this.currentAnnotation.height) < 2) {
+                            this.currentAnnotation.height = 2;
+                        }
+                    }
                     
-                    // Save highlight
-                    this.saveHighlight(this.currentHighlight);
-                    
-                    // Draw permanent highlight
-                    this.drawHighlight(this.currentHighlight, true);
+                    this.currentAnnotation.id = Date.now().toString();
+                    this.saveAnnotation(this.currentAnnotation);
+                    this.drawAnnotation(this.currentAnnotation, true);
                 }
                 
-                this.currentHighlight = null;
-                this.highlightStart = null;
+                this.currentAnnotation = null;
+                this.annotationStart = null;
             }
 
-            drawHighlight(highlight, permanent = false) {
+            drawAnnotation(annotation, permanent = false) {
                 if (!permanent) {
-                    // Clear temporary highlights
-                    const tempHighlights = document.querySelectorAll('.highlight:not([data-permanent])');
-                    tempHighlights.forEach(el => el.remove());
+                    document.querySelectorAll('.annotation:not([data-permanent])').forEach(el => el.remove());
                 }
                 
-                const highlightEl = document.createElement('div');
-                highlightEl.className = 'highlight';
-                highlightEl.style.left = `${highlight.x * this.transform.scale}px`;
-                highlightEl.style.top = `${highlight.y * this.transform.scale}px`;
-                highlightEl.style.width = `${highlight.width * this.transform.scale}px`;
-                highlightEl.style.height = `${highlight.height * this.transform.scale}px`;
+                const annotationEl = document.createElement('div');
+                annotationEl.className = `annotation ${annotation.type}`;
+                
+                // Set position and size
+                annotationEl.style.left = `${annotation.x * this.transform.scale}px`;
+                annotationEl.style.top = `${annotation.y * this.transform.scale}px`;
+                annotationEl.style.width = `${annotation.width * this.transform.scale}px`;
+                annotationEl.style.height = `${annotation.height * this.transform.scale}px`;
+                
+                // Set colors
+                if (annotation.type === 'highlight') {
+                    annotationEl.style.background = annotation.color;
+                } else if (annotation.type === 'rectangle') {
+                    annotationEl.style.borderColor = annotation.borderColor;
+                } else if (annotation.type === 'line') {
+                    annotationEl.style.borderColor = annotation.borderColor;
+                    
+                    // Calculate line angle for the pseudo-element
+                    const angle = Math.atan2(annotation.height, annotation.width) * (180 / Math.PI);
+                    const length = Math.sqrt(annotation.width * annotation.width + annotation.height * annotation.height);
+                    
+                    annotationEl.style.width = `${length * this.transform.scale}px`;
+                    annotationEl.style.height = '2px';
+                    annotationEl.style.transform = `rotate(${angle}deg)`;
+                    annotationEl.style.transformOrigin = '0 0';
+                }
                 
                 if (permanent) {
-                    highlightEl.setAttribute('data-id', highlight.id);
-                    highlightEl.setAttribute('data-permanent', 'true');
-                    highlightEl.style.position = 'absolute';
+                    annotationEl.setAttribute('data-id', annotation.id);
+                    annotationEl.setAttribute('data-permanent', 'true');
                     
-                    highlightEl.addEventListener('click', (e) => {
+                    annotationEl.addEventListener('click', (e) => {
                         e.stopPropagation();
                         if (this.isAnnotationMode) {
-                            this.showNoteSheet(highlight);
+                            this.showNoteSheet(annotation);
                         }
                     });
                     
-                    highlightEl.addEventListener('contextmenu', (e) => {
+                    annotationEl.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         if (this.isAnnotationMode) {
-                            this.deleteHighlight(highlight.id);
+                            this.deleteAnnotation(annotation.id);
                         }
                     });
                 }
                 
-                this.pdfContainer.appendChild(highlightEl);
-            }
-
-            findHighlightAt(x, y) {
-                const highlights = this.annotations.get(this.currentPage) || [];
-                return highlights.find(h => 
-                    x >= h.x && x <= h.x + h.width &&
-                    y >= h.y && y <= h.y + h.height
-                );
+                this.pdfContainer.appendChild(annotationEl);
             }
 
             async renderPage(pageNum) {
@@ -955,22 +1086,23 @@
                 this.currentPage = pageNum;
                 document.getElementById('page-num').textContent = pageNum;
                 
-                // Remove all highlights
-                document.querySelectorAll('.highlight').forEach(el => el.remove());
+                // Clear existing annotations from DOM
+                document.querySelectorAll('.annotation').forEach(el => el.remove());
                 
                 const page = await this.pdfDoc.getPage(pageNum);
                 
-                // Calculate initial viewport
+                // Calculate viewport
                 const viewport = page.getViewport({ scale: 1 });
                 
-                // Calculate scale to fit screen
-                const containerWidth = window.innerWidth * 0.95;
-                const containerHeight = window.innerHeight * 0.85;
+                // Calculate scale to fill screen (with small margins)
+                const containerWidth = window.innerWidth * 0.98; // 98% of screen
+                const containerHeight = window.innerHeight * 0.95; // 95% of screen
+                
                 const scaleX = containerWidth / viewport.width;
                 const scaleY = containerHeight / viewport.height;
                 const fitScale = Math.min(scaleX, scaleY);
                 
-                // Set base scale and current scale
+                // Set scales
                 this.baseScale = fitScale;
                 this.currentScale = fitScale;
                 this.transform.scale = fitScale;
@@ -982,7 +1114,7 @@
                 this.transform.y = 0;
                 this.velocity = { x: 0, y: 0 };
                 
-                // Calculate actual viewport with scale
+                // Calculate actual viewport
                 const actualViewport = page.getViewport({ scale: fitScale });
                 
                 // Set canvas dimensions
@@ -997,22 +1129,18 @@
                 // Update render context
                 this.renderContext.viewport = actualViewport;
                 
-                // Clear canvas
+                // Clear and render
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                
-                // Render PDF page
                 await page.render(this.renderContext).promise;
                 
-                // Apply initial transform
+                // Apply transform and update
                 this.applyTransform();
-                
-                // Update zoom indicator
                 this.updateZoomIndicator();
                 
-                // Restore annotations for this page
+                // Restore annotations
                 this.restoreAnnotations();
                 
-                // Exit annotation mode after page change
+                // Exit annotation mode
                 this.exitAnnotationMode();
             }
 
@@ -1022,7 +1150,6 @@
             }
 
             handleResize() {
-                // Recalculate base scale on resize
                 this.baseScale = 1.0;
                 this.renderPage(this.currentPage);
             }
@@ -1040,7 +1167,6 @@
             }
 
             resetZoom() {
-                // Animate to center and base scale
                 this.transform.scale = this.baseScale;
                 this.transform.x = 0;
                 this.transform.y = 0;
@@ -1050,32 +1176,29 @@
                 this.updateZoomIndicator();
             }
 
-            saveHighlight(highlight) {
-                const pageHighlights = this.annotations.get(highlight.page) || [];
-                pageHighlights.push(highlight);
-                this.annotations.set(highlight.page, pageHighlights);
+            saveAnnotation(annotation) {
+                const pageAnnotations = this.annotations.get(annotation.page) || [];
+                pageAnnotations.push(annotation);
+                this.annotations.set(annotation.page, pageAnnotations);
                 
                 this.saveToStorage();
             }
 
             restoreAnnotations() {
-                // Draw highlights for current page
-                const pageHighlights = this.annotations.get(this.currentPage) || [];
-                pageHighlights.forEach(highlight => {
-                    this.drawHighlight(highlight, true);
+                const pageAnnotations = this.annotations.get(this.currentPage) || [];
+                pageAnnotations.forEach(annotation => {
+                    this.drawAnnotation(annotation, true);
                 });
             }
 
-            showNoteSheet(highlight) {
-                this.activeHighlight = highlight;
+            showNoteSheet(annotation) {
+                this.activeAnnotation = annotation;
                 
                 const noteSheet = document.getElementById('note-sheet');
                 const overlay = document.getElementById('overlay');
                 const noteText = document.getElementById('note-text');
                 
-                // Load existing note
-                noteText.value = highlight.note || '';
-                
+                noteText.value = annotation.note || '';
                 noteSheet.classList.add('active');
                 overlay.classList.add('active');
             }
@@ -1087,39 +1210,36 @@
                 noteSheet.classList.remove('active');
                 overlay.classList.remove('active');
                 
-                this.activeHighlight = null;
+                this.activeAnnotation = null;
             }
 
             saveNote() {
-                if (!this.activeHighlight) return;
+                if (!this.activeAnnotation) return;
                 
                 const noteText = document.getElementById('note-text').value;
-                this.activeHighlight.note = noteText;
+                this.activeAnnotation.note = noteText;
                 
-                // Update in annotations
-                const pageHighlights = this.annotations.get(this.activeHighlight.page) || [];
-                const index = pageHighlights.findIndex(h => h.id === this.activeHighlight.id);
+                const pageAnnotations = this.annotations.get(this.activeAnnotation.page) || [];
+                const index = pageAnnotations.findIndex(a => a.id === this.activeAnnotation.id);
                 if (index !== -1) {
-                    pageHighlights[index].note = noteText;
+                    pageAnnotations[index].note = noteText;
                     this.saveToStorage();
                 }
                 
                 this.hideNoteSheet();
             }
 
-            deleteHighlight(highlightId = null) {
-                const id = highlightId || (this.activeHighlight && this.activeHighlight.id);
+            deleteAnnotation(annotationId = null) {
+                const id = annotationId || (this.activeAnnotation && this.activeAnnotation.id);
                 if (!id) return;
                 
-                // Remove from DOM
-                const highlightEl = document.querySelector(`.highlight[data-id="${id}"]`);
-                if (highlightEl) {
-                    highlightEl.remove();
+                const annotationEl = document.querySelector(`.annotation[data-id="${id}"]`);
+                if (annotationEl) {
+                    annotationEl.remove();
                 }
                 
-                // Remove from annotations
-                const pageHighlights = this.annotations.get(this.currentPage) || [];
-                const filtered = pageHighlights.filter(h => h.id !== id);
+                const pageAnnotations = this.annotations.get(this.currentPage) || [];
+                const filtered = pageAnnotations.filter(a => a.id !== id);
                 this.annotations.set(this.currentPage, filtered);
                 
                 this.saveToStorage();
