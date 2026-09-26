@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Computer True or False Practice</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f4f7fb;color:#172033;font-family:"Poppins","Segoe UI",Arial,sans-serif}
+.container{max-width:900px;margin:auto;padding:18px 14px 50px}
+.header{background:linear-gradient(135deg,#173b7a,#2868c7);color:#fff;border-radius:18px;padding:27px 18px;text-align:center;box-shadow:0 8px 24px rgba(20,50,100,.18)}
+.header h1{margin:0 0 5px;font-size:clamp(24px,6vw,34px)}
+.header p{margin:0;opacity:.92}
+.badges{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+.badge{background:rgba(255,255,255,.16);padding:6px 12px;border-radius:30px;font-size:13px}
+.progress-wrap{position:sticky;top:0;z-index:10;background:rgba(244,247,251,.95);padding:9px 0}
+.progress{height:9px;background:#dfe5ee;border-radius:99px;overflow:hidden}
+.bar{height:100%;width:0;background:#2868c7;transition:.25s}
+.question{background:#fff;border:1px solid #e1e7ef;border-radius:14px;padding:17px;margin:12px 0;box-shadow:0 3px 12px rgba(20,35,60,.06)}
+.qtext{font-weight:600;line-height:1.6;margin-bottom:12px}
+.qnum{color:#2868c7;font-weight:800;margin-right:7px}
+.option{display:flex;align-items:center;gap:9px;border:1.5px solid #d5dce7;background:#fafbfd;padding:10px 13px;border-radius:10px;margin-top:8px;cursor:pointer;min-height:44px}
+.option:hover{border-color:#2868c7;background:#f2f7ff}
+.option input{width:18px;height:18px;accent-color:#2868c7}
+.question.correct{border-left:5px solid #20a05a}
+.question.wrong{border-left:5px solid #e34b4b}
+.feedback{display:none;margin-top:10px;padding:10px 12px;background:#f1f5fa;border-radius:8px;font-size:14px}
+.buttons{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:20px 0}
+button{border:0;border-radius:10px;padding:12px 21px;font-size:15px;font-weight:700;cursor:pointer}
+#submitBtn{background:#2868c7;color:#fff}
+#resetBtn{background:#e8edf4;color:#172033}
+.result{display:none;background:#fff;border-radius:16px;padding:23px;text-align:center;box-shadow:0 5px 20px rgba(20,35,60,.1)}
+.score{font-size:36px;font-weight:800;color:#2868c7}
+</style>
+</head>
+<body>
+<div class="container">
+<header class="header">
+<h1>Computer True or False Practice</h1>
+<p>Randomized Interactive Test</p>
+<div class="badges">
+<span class="badge">20 Questions</span>
+<span class="badge">1 Mark Each</span>
+<span class="badge">Random Order</span>
+</div>
+</header>
+
+<div class="progress-wrap">
+<div class="progress"><div class="bar" id="bar"></div></div>
+</div>
+
+<div id="quiz"></div>
+
+<div class="buttons">
+<button id="submitBtn">Submit Test</button>
+<button id="resetBtn">New Random Test</button>
+</div>
+
+<div class="result" id="result">
+<div>Your Score</div>
+<div class="score" id="score"></div>
+<p id="message"></p>
+</div>
+</div>
+
+<script>
+const questions=[
+["A computer can work very fast.",true],
+["A computer can do big calculation fast.",true],
+["A computer can think.",false],
+["A human being cannot think.",false],
+["A computer can make mistakes.",true],
+["A human being can make mistakes.",true],
+["A computer can remember many things.",true],
+["A computer is not used at home.",false],
+["A computer is used in a school.",true],
+["A computer is used in office.",true],
+["A computer is a machine.",true],
+["A computer is not used to play games.",false],
+["A computer can’t make our work easy.",false],
+["A computer is used to watch movies.",true],
+["The backspace key is used to erase what you have typed.",true],
+["A keyboard has 100 keys.",false],
+["Human needs electricity to do work.",false],
+["The screen of the computer is called keyboard.",false],
+["Computer work on its own.",false],
+["Mouse is an output device.",false]
+];
+
+let shuffled=[];
+let submitted=false;
+
+function shuffle(arr){
+ const x=[...arr];
+ for(let i=x.length-1;i>0;i--){
+  const j=Math.floor(Math.random()*(i+1));
+  [x[i],x[j]]=[x[j],x[i]];
+ }
+ return x;
+}
+
+function renderQuiz(){
+ shuffled=shuffle(questions);
+ submitted=false;
+ document.getElementById("result").style.display="none";
+ document.getElementById("bar").style.width="0%";
+
+ document.getElementById("quiz").innerHTML=shuffled.map((item,i)=>`
+ <div class="question" id="q${i}">
+  <div class="qtext"><span class="qnum">${i+1}.</span>${item[0]}</div>
+  <label class="option">
+   <input type="radio" name="q${i}" value="true">
+   <span>True</span>
+  </label>
+  <label class="option">
+   <input type="radio" name="q${i}" value="false">
+   <span>False</span>
+  </label>
+  <div class="feedback" id="f${i}"></div>
+ </div>`).join("");
+
+ document.querySelectorAll("input[type=radio]").forEach(input=>{
+  input.addEventListener("change",updateProgress);
+ });
+}
+
+function updateProgress(){
+ let answered=0;
+ shuffled.forEach((_,i)=>{
+  if(document.querySelector(`input[name="q${i}"]:checked`)) answered++;
+ });
+ document.getElementById("bar").style.width=(answered/20*100)+"%";
+}
+
+function submitQuiz(){
+ if(submitted)return;
+ submitted=true;
+ let score=0;
+
+ shuffled.forEach((item,i)=>{
+  const selected=document.querySelector(`input[name="q${i}"]:checked`);
+  const card=document.getElementById("q"+i);
+  const feedback=document.getElementById("f"+i);
+
+  card.classList.remove("correct","wrong");
+
+  if(selected && selected.value===String(item[1])){
+   score++;
+   card.classList.add("correct");
+   feedback.innerHTML="<b>Correct!</b>";
+  }else if(selected){
+   card.classList.add("wrong");
+   feedback.innerHTML="<b>Incorrect.</b> Correct answer: "+(item[1]?"True":"False");
+  }else{
+   card.classList.add("wrong");
+   feedback.innerHTML="<b>Not answered.</b> Correct answer: "+(item[1]?"True":"False");
+  }
+  feedback.style.display="block";
+ });
+
+ document.getElementById("bar").style.width="100%";
+ const percentage=Math.round(score/20*100);
+ document.getElementById("score").textContent=score+" / 20 ("+percentage+"%)";
+
+ let message;
+ if(percentage>=90) message="Excellent work!";
+ else if(percentage>=75) message="Good job! Review the questions you missed.";
+ else if(percentage>=50) message="Nice attempt. Practice again to improve.";
+ else message="Keep practicing and review the correct answers.";
+
+ document.getElementById("message").textContent=message;
+ document.getElementById("result").style.display="block";
+ document.getElementById("result").scrollIntoView({behavior:"smooth"});
+}
+
+document.getElementById("submitBtn").addEventListener("click",submitQuiz);
+document.getElementById("resetBtn").addEventListener("click",()=>{
+ renderQuiz();
+ window.scrollTo({top:0,behavior:"smooth"});
+});
+
+renderQuiz();
+</script>
+</body>
+</html>

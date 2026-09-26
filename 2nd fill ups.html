@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Computer GK - Fill in the Blanks</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f4f7fb;color:#172033;font-family:"Poppins","Segoe UI",Arial,sans-serif}
+.container{max-width:920px;margin:auto;padding:18px 14px 50px}
+.header{background:linear-gradient(135deg,#173b7a,#2868c7);color:white;border-radius:18px;padding:27px 18px;text-align:center;box-shadow:0 8px 24px rgba(20,50,100,.18)}
+.header h1{margin:0 0 5px;font-size:clamp(24px,6vw,34px)}
+.header p{margin:0;opacity:.92}
+.badges{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+.badge{background:rgba(255,255,255,.16);padding:6px 12px;border-radius:30px;font-size:13px}
+.helpbox{background:#fff;border:2px solid #d8e2f0;border-radius:14px;padding:16px;margin:16px 0;box-shadow:0 3px 12px rgba(20,35,60,.06)}
+.helpbox h2{margin:0 0 10px;font-size:18px;color:#173b7a}
+.words{display:flex;flex-wrap:wrap;gap:8px}
+.word{background:#eef4fc;border:1px solid #d5e1f2;border-radius:8px;padding:6px 10px;font-size:14px}
+.instructions{background:#fff;padding:14px 17px;border-radius:13px;margin:16px 0;border:1px solid #e3e8f0}
+.progress-wrap{position:sticky;top:0;z-index:10;background:rgba(244,247,251,.95);padding:9px 0}
+.progress{height:9px;background:#dfe5ee;border-radius:99px;overflow:hidden}
+.bar{height:100%;width:0;background:#2868c7;transition:.25s}
+.question{background:#fff;border:1px solid #e1e7ef;border-radius:14px;padding:17px;margin:12px 0;box-shadow:0 3px 12px rgba(20,35,60,.06)}
+.qtext{font-weight:600;line-height:1.6}
+.qnum{color:#2868c7;font-weight:800;margin-right:7px}
+.answer{display:none;margin-top:10px;padding:9px 12px;background:#edf8f1;border-left:4px solid #20a05a;border-radius:7px}
+.question.revealed .answer{display:block}
+.buttons{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:20px 0}
+button{border:0;border-radius:10px;padding:12px 21px;font-size:15px;font-weight:700;cursor:pointer}
+#showBtn{background:#2868c7;color:#fff}
+#resetBtn{background:#e8edf4;color:#172033}
+.result{display:none;background:#fff;border-radius:16px;padding:23px;text-align:center;box-shadow:0 5px 20px rgba(20,35,60,.1)}
+.score{font-size:30px;font-weight:800;color:#2868c7}
+@media(max-width:600px){.question{padding:14px}.word{font-size:13px}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="header">
+<h1>Computer GK</h1>
+<p>Fill in the Blanks • Notebook Practice</p>
+<div class="badges">
+<span class="badge">20 Questions</span>
+<span class="badge">Help Box</span>
+<span class="badge">Random Order</span>
+</div>
+</header>
+
+<div class="helpbox">
+<h2>HELP BOX</h2>
+<div class="words" id="helpWords"></div>
+</div>
+
+<div class="instructions">
+<b>How to practice:</b> Look at the Help Box, read each question, and write the correct word in your notebook. When finished, tap <b>Show Answers</b> to check.
+</div>
+
+<div class="progress-wrap"><div class="progress"><div class="bar" id="bar"></div></div></div>
+
+<div id="quiz"></div>
+
+<div class="buttons">
+<button id="showBtn" onclick="showAnswers()">Show Answers</button>
+<button id="resetBtn" onclick="resetQuiz()">New Random Test</button>
+</div>
+
+<div class="result" id="result">
+<div>Answer Key</div>
+<div class="score">20 / 20 Questions</div>
+<p>All answers are now shown below the questions. Check your notebook answers.</p>
+</div>
+
+</div>
+
+<script>
+const questions=[
+{q:"Joystick is a device __________ device.",a:"input"},
+{q:"A computer never makes __________.",a:"mistakes"},
+{q:"In an IPO cycle, 'P' stands for __________.",a:"processing"},
+{q:"A tablet has a __________.",a:"touchscreen"},
+{q:"The result on a monitor is called the __________.",a:"output"},
+{q:"In shops, computers are used to make __________.",a:"bills"},
+{q:"A computer has no __________.",a:"feelings"},
+{q:"A computer is used to book __________.",a:"tickets"},
+{q:"A computer needs human __________ to work.",a:"instruction"},
+{q:"Computers help in designing __________.",a:"clothes"},
+{q:"At offices, computers are used to send and receive __________.",a:"e-mails"},
+{q:"__________ is known as the father of computers.",a:"Charles Babbage"},
+{q:"Computers are used to maintain __________ in school.",a:"accounts"},
+{q:"The full form of CPU is __________.",a:"Central Processing Unit"},
+{q:"Pen drive is also called a __________ drive.",a:"flash"},
+{q:"A monitor is also called __________.",a:"VDU"},
+{q:"The printed copy on paper is called __________.",a:"hard copy"},
+{q:"Writing on a computer is called __________.",a:"typing"},
+{q:"All parts of a computer are connected to the CPU box through __________.",a:"wires"},
+{q:"The CPU is called the __________ of a computer.",a:"brain"}
+];
+
+function shuffle(arr){
+ const x=[...arr];
+ for(let i=x.length-1;i>0;i--){
+  const j=Math.floor(Math.random()*(i+1));
+  [x[i],x[j]]=[x[j],x[i]];
+ }
+ return x;
+}
+
+let shuffled=[];
+
+function render(){
+ shuffled=shuffle(questions);
+ document.getElementById("bar").style.width="0%";
+ document.getElementById("result").style.display="none";
+
+ // Randomize the Help Box separately.
+ const help=shuffle(questions.map(x=>x.a));
+ document.getElementById("helpWords").innerHTML=help
+   .map(x=>`<span class="word">${x}</span>`).join("");
+
+ document.getElementById("quiz").innerHTML=shuffled.map((item,i)=>`
+  <div class="question" id="q${i}">
+   <div class="qtext"><span class="qnum">${i+1}.</span>${item.q}</div>
+   <div class="answer"><b>Answer:</b> ${item.a}</div>
+  </div>
+ `).join("");
+}
+
+function showAnswers(){
+ shuffled.forEach((_,i)=>document.getElementById("q"+i).classList.add("revealed"));
+ document.getElementById("bar").style.width="100%";
+ document.getElementById("result").style.display="block";
+ document.getElementById("result").scrollIntoView({behavior:"smooth"});
+}
+
+function resetQuiz(){
+ render();
+ window.scrollTo({top:0,behavior:"smooth"});
+}
+
+render();
+</script>
+</body>
+</html>
