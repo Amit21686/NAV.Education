@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PW Lecture Downloader — Setup Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
+      }
+    }
+  }
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(56,189,248,0.10), transparent 60%),
+      radial-gradient(800px 400px at 90% 110%, rgba(99,102,241,0.10), transparent 60%),
+      #070b16;
+    color: #e2e8f0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .card {
+    background: linear-gradient(180deg, rgba(17,24,39,0.85), rgba(15,23,42,0.75));
+    border: 1px solid rgba(148,163,184,0.10);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03);
+    backdrop-filter: blur(8px);
+  }
+  .divider { height:1px; background: linear-gradient(90deg, transparent, rgba(148,163,184,0.18), transparent); }
+  .step-badge {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:26px; height:26px; border-radius:9999px;
+    background: linear-gradient(180deg,#38bdf8,#0ea5e9);
+    color:#06121f; font-weight:700; font-size:12px;
+    box-shadow: 0 0 0 1px rgba(56,189,248,0.35), 0 6px 16px -6px rgba(56,189,248,0.6);
+    flex-shrink:0;
+  }
+  .btn {
+    display:flex; align-items:center; justify-content:center; gap:.5rem;
+    width:100%; padding:.65rem .9rem; border-radius:12px;
+    font-weight:600; font-size:13.5px; letter-spacing:.1px;
+    background: linear-gradient(180deg,#38bdf8,#0284c7);
+    color:#03131f; text-decoration:none;
+    border:1px solid rgba(56,189,248,0.4);
+    box-shadow: 0 8px 22px -10px rgba(56,189,248,0.7);
+    transition: transform .15s ease, filter .15s ease;
+  }
+  .btn:hover { filter:brightness(1.06); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn-ghost {
+    background: rgba(148,163,184,0.06);
+    border: 1px solid rgba(148,163,184,0.18);
+    color:#cbd5e1; box-shadow:none;
+  }
+  .btn-ghost:hover { background: rgba(148,163,184,0.12); }
+  .note {
+    background: rgba(234,179,8,0.07);
+    border: 1px solid rgba(234,179,8,0.25);
+    border-radius: 12px;
+  }
+  .ok {
+    background: rgba(16,185,129,0.07);
+    border: 1px solid rgba(16,185,129,0.25);
+    border-radius: 12px;
+  }
+  .warn {
+    background: rgba(239,68,68,0.07);
+    border: 1px solid rgba(239,68,68,0.25);
+    border-radius: 12px;
+  }
+  code {
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    background: rgba(2,6,23,0.7);
+    border:1px solid rgba(148,163,184,0.15);
+    padding:2px 6px; border-radius:6px; color:#7dd3fc;
+  }
+  .rail {
+    display:flex; gap:14px; overflow-x:auto; padding: 4px 4px 14px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(56,189,248,0.35) transparent;
+  }
+  .rail::-webkit-scrollbar { height:6px; }
+  .rail::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.35); border-radius:9999px; }
+  .rail::-webkit-scrollbar-track { background: transparent; }
+  .rail-item { scroll-snap-align: center; flex: 0 0 auto; width: 190px; }
+  .rail-item img {
+    width:100%; display:block; border-radius:14px;
+    border:1px solid rgba(148,163,184,0.15);
+    box-shadow: 0 12px 30px -14px rgba(0,0,0,0.8);
+    background:#0b1220;
+  }
+  .chip {
+    font-size:11px; font-weight:600; letter-spacing:.4px; text-transform:uppercase;
+    color:#7dd3fc; background: rgba(56,189,248,0.10);
+    border:1px solid rgba(56,189,248,0.25);
+    padding:3px 8px; border-radius:9999px;
+  }
+  .section-title { font-size:15px; font-weight:700; letter-spacing:.2px; }
+  .muted { color:#94a3b8; }
+  .list li { position:relative; padding-left: 18px; }
+  .list li::before {
+    content:""; position:absolute; left:0; top:.55em;
+    width:6px; height:6px; border-radius:9999px;
+    background:#38bdf8; box-shadow:0 0 0 3px rgba(56,189,248,0.15);
+  }
+</style>
+</head>
+<body class="font-sans">
+
+<main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+
+  <header class="text-center mb-8">
+    <div class="inline-flex items-center gap-2 mb-3">
+      <span class="chip">Setup Guide</span>
+      <span class="chip" style="color:#a7f3d0;background:rgba(16,185,129,0.10);border-color:rgba(16,185,129,0.25);">v1.0</span>
+    </div>
+    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">
+      PW Lecture <span class="text-sky-400">Downloader</span>
+    </h1>
+    <p class="muted text-sm mt-2 max-w-md mx-auto">
+      Download PW lectures with audio and full seeking support — using a browser extension and a lightweight Android app.
+    </p>
+  </header>
+
+  <section class="card p-5 mb-4">
+    <h2 class="section-title text-sky-300 mb-3">How it works</h2>
+    <p class="text-sm muted mb-3">This setup has two parts that work together:</p>
+    <ol class="space-y-2 text-sm">
+      <li class="flex gap-3">
+        <span class="step-badge">1</span>
+        <span><strong class="text-slate-100">Lemur Browser</strong> — plays the PW video and captures the DRM keys + stream URL, then generates a download command.</span>
+      </li>
+      <li class="flex gap-3">
+        <span class="step-badge">2</span>
+        <span><strong class="text-slate-100">Video Downloader App</strong> — takes that command and saves the video to your phone.</span>
+      </li>
+    </ol>
+    <div class="note mt-4 p-3">
+      <p class="text-[12px] text-amber-200/90">
+        ⚠️ For personal, offline viewing only. Please respect copyright laws.
+      </p>
+    </div>
+  </section>
+
+  <section class="card p-5 mb-4">
+    <h2 class="section-title text-amber-300 mb-4">Downloads</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+      <div class="rounded-xl p-3.5" style="background:rgba(2,6,23,0.5);border:1px solid rgba(148,163,184,0.10);">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[13px] font-semibold text-slate-100">Lemur Browser</span>
+          <span class="text-[10px] muted">Browser</span>
+        </div>
+        <a class="btn" href="https://play.google.com/store/apps/details?id=com.lemurbrowser.exts" target="_blank" rel="noopener">Play Store</a>
+      </div>
+
+      <div class="rounded-xl p-3.5" style="background:rgba(2,6,23,0.5);border:1px solid rgba(148,163,184,0.10);">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[13px] font-semibold text-slate-100">WidevineProxy2</span>
+          <span class="text-[10px] muted">Extension .zip</span>
+        </div>
+        <a class="btn" href="https://github.com/Amit21686/NAV.Education/raw/refs/heads/main/WidevineProxy2-1.2.7.zip" target="_blank" rel="noopener">Download ZIP</a>
+      </div>
+
+      <div class="rounded-xl p-3.5" style="background:rgba(2,6,23,0.5);border:1px solid rgba(148,163,184,0.10);">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[13px] font-semibold text-slate-100">Widevine Device</span>
+          <span class="text-[10px] muted">.wvd file</span>
+        </div>
+        <a class="btn" href="https://github.com/Amit21686/NAV.Education/raw/refs/heads/main/unknown_android_sdk_built_for_x86_16.0.0_1be7dff4_8162_l3.wvd" target="_blank" rel="noopener">Download .wvd</a>
+      </div>
+
+      <div class="rounded-xl p-3.5" style="background:rgba(2,6,23,0.5);border:1px solid rgba(148,163,184,0.10);">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[13px] font-semibold text-slate-100">Video Downloader</span>
+          <span class="text-[10px] muted">Android .apk</span>
+        </div>
+        <a class="btn" href="https://github.com/Amit21686/NAV.Education/releases/download/Application/Video-Downloader.apk" target="_blank" rel="noopener">Download APK</a>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="card p-5 mb-4">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="step-badge">1</span>
+      <h2 class="section-title text-sky-300">Set up Lemur Browser</h2>
+    </div>
+    <ol class="space-y-3 text-sm list-none">
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">01</span><span>Install <strong>Lemur Browser</strong> from the Play Store link above.</span></li>
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">02</span><span>Download the <strong>WidevineProxy2 ZIP</strong>. Do <em>not</em> extract it.</span></li>
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">03</span><span>Open Lemur and go to <code>chrome://extensions/</code></span></li>
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">04</span><span>Turn <strong>Developer mode</strong> ON (top-right).</span></li>
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">05</span><span>Tap <strong>Load *.zip/*.crx/*.user.js file</strong> and select the downloaded ZIP.</span></li>
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">06</span><span>Open the extension → <strong>Choose File</strong> → select the <code>.wvd</code> file.</span></li>
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">07</span>
+        <div>
+          <span>In <strong>Command options → Additional arguments</strong>, paste:</span>
+          <div class="mt-2 p-2.5 rounded-lg font-mono text-[11.5px] text-sky-300" style="background:rgba(2,6,23,0.7);border:1px solid rgba(148,163,184,0.15);">
+            --append-url-params --save-dir /sdcard/Movies/PW_Downloads
+          </div>
+        </div>
+      </li>
+    </ol>
+    <div class="note mt-4 p-3">
+      <p class="text-[12px] text-amber-200/90">
+        A red <strong>Errors</strong> badge in the extension is normal on Lemur and can be ignored as long as keys are being captured.
+      </p>
+    </div>
+  </section>
+
+  <section class="card p-5 mb-4">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="step-badge">2</span>
+      <h2 class="section-title text-sky-300">Install the Video Downloader App</h2>
+    </div>
+    <p class="text-sm muted mb-3">Download and install the APK from the Downloads section above.</p>
+    <div class="ok p-3">
+      <p class="text-[12px] text-emerald-200/90">
+        If prompted, allow <strong>Install from Unknown Sources</strong> in your phone settings.
+      </p>
+    </div>
+  </section>
+
+  <section class="card p-5 mb-4">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="step-badge">3</span>
+      <h2 class="section-title text-sky-300">A quick look at the app</h2>
+    </div>
+    <p class="text-xs muted mb-3 pl-9">Swipe to view →</p>
+
+    <div class="rail">
+      <div class="rail-item">
+        <img loading="lazy" src="https://raw.githubusercontent.com/amit21686/NAV-Education/main/images/IMG_1790579338465.jpg" alt="App screenshot 1">
+      </div>
+      <div class="rail-item">
+        <img loading="lazy" src="https://raw.githubusercontent.com/amit21686/NAV-Education/main/images/IMG_1790579390883.jpg" alt="App screenshot 2">
+      </div>
+      <div class="rail-item">
+        <img loading="lazy" src="https://raw.githubusercontent.com/amit21686/NAV-Education/main/images/IMG_1790579411036.jpg" alt="App screenshot 3">
+      </div>
+      <div class="rail-item">
+        <img loading="lazy" src="https://raw.githubusercontent.com/amit21686/NAV-Education/main/images/IMG_1790579430830.jpg" alt="App screenshot 4">
+      </div>
+      <div class="rail-item">
+        <img loading="lazy" src="https://raw.githubusercontent.com/amit21686/NAV-Education/main/images/IMG_1790579448083.jpg" alt="App screenshot 5">
+      </div>
+    </div>
+  </section>
+
+  <section class="card p-5 mb-4">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="step-badge">4</span>
+      <h2 class="section-title text-sky-300">Download your first lecture</h2>
+    </div>
+    <ol class="space-y-3 text-sm">
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">01</span><span>In Lemur, open the PW website and play the lecture.</span></li>
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">02</span><span>Open the <strong>WidevineProxy2</strong> extension and copy the full command from the <strong>Cmd</strong> section.</span></li>
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">03</span><span>Open the <strong>Video Downloader</strong> app.</span></li>
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">04</span><span>Paste the command into the input box.</span></li>
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">05</span><span>Tap <strong>Download</strong> and wait for it to finish.</span></li>
+      <li class="flex gap-3"><span class="muted font-mono text-xs pt-0.5">06</span><span>Your video is saved to <code>/sdcard/Movies/PW_Downloads</code> and appears in your Gallery.</span></li>
+    </ol>
+    <div class="note mt-4 p-3">
+      <p class="text-[12px] text-amber-200/90">
+        The app can't extract keys on its own — it only downloads. Always generate a fresh command from Lemur right before pasting.
+      </p>
+    </div>
+  </section>
+
+  <section class="card p-5 mb-4">
+    <h2 class="section-title text-red-300 mb-4">Troubleshooting</h2>
+    <ul class="space-y-3 text-sm list">
+      <li><strong>403 Forbidden</strong> — the link expired. Refresh the video in Lemur and copy a new command.</li>
+      <li><strong>No audio</strong> — make sure the command includes the <code>--key</code> line and matches the current video.</li>
+      <li><strong>Can't seek</strong> — the app saves as MP4; try a different player (e.g. VLC or MX Player).</li>
+      <li><strong>Permission denied</strong> — grant Storage permission to the app in Settings → Apps.</li>
+      <li><strong>APK won't install</strong> — enable "Install from Unknown Sources" or install via your file manager.</li>
+      <li><strong>Video not detected</strong> — copy a fresh command from Lemur and paste it again in the app.</li>
+    </ul>
+  </section>
+
+  <section class="card p-5 mb-8">
+    <h2 class="section-title text-emerald-300 mb-4">Good to know</h2>
+    <ul class="space-y-2.5 text-sm list">
+      <li>Keep both apps open while downloading — one generates the command, the other runs it.</li>
+      <li>Sign in to PW inside Lemur Browser first.</li>
+      <li>You can queue multiple lectures by repeating the copy-and-paste step.</li>
+      <li>Downloads land in <code>/sdcard/Movies/PW_Downloads</code>.</li>
+    </ul>
+  </section>
+
+  <div class="divider mb-5"></div>
+  <footer class="text-center text-[11px] muted">
+    <p>For personal offline use. Respect copyright.</p>
+    <p class="mt-1">© 2026 PW Lecture Downloader Guide</p>
+  </footer>
+
+</main>
+</body>
+</html>
