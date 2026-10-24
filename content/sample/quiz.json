@@ -1,0 +1,16 @@
+{
+  "quiz_title": "Sample Quiz",
+  "questions": [
+    {
+      "question": "Which content source is used by NAV Education?",
+      "options": [
+        "GitHub JSON files",
+        "A required custom API",
+        "Only local files",
+        "None of these"
+      ],
+      "answer": 0,
+      "explanation": "The app reads public content from JSON files in the configured repository."
+    }
+  ]
+}
