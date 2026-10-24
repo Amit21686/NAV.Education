@@ -1,0 +1,17 @@
+{
+  "title": "Sample Chapter Notes",
+  "content": [
+    {
+      "type": "heading",
+      "text": "Getting started"
+    },
+    {
+      "type": "text",
+      "text": "Replace this sample text with your own study notes."
+    },
+    {
+      "type": "bullet",
+      "text": "Add notes, examples and key points here."
+    }
+  ]
+}
