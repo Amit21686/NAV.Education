@@ -1,0 +1,30 @@
+{
+  "cards": [
+    {
+      "id": "classes",
+      "title": "Classes / STD 1–12",
+      "description": "Choose a class and explore its subjects",
+      "type": "classes",
+      "icon": 59404,
+      "colorIndex": 0
+    },
+    {
+      "id": "subjects",
+      "title": "All Subjects",
+      "description": "Browse subjects and chapters",
+      "type": "subjects",
+      "url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json",
+      "icon": 59406,
+      "colorIndex": 1
+    },
+    {
+      "id": "revision",
+      "title": "Quick Revision",
+      "description": "Open your revision resources",
+      "type": "url",
+      "url": "https://Amit21686.github.io/NAV.Education/",
+      "icon": 59641,
+      "colorIndex": 2
+    }
+  ]
+}
