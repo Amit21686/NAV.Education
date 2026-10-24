@@ -1,0 +1,76 @@
+{
+  "classes": [
+    {
+      "id": "class-1",
+      "name": "Class 1",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    },
+    {
+      "id": "class-2",
+      "name": "Class 2",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    },
+    {
+      "id": "class-3",
+      "name": "Class 3",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    },
+    {
+      "id": "class-4",
+      "name": "Class 4",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    },
+    {
+      "id": "class-5",
+      "name": "Class 5",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    },
+    {
+      "id": "class-6",
+      "name": "Class 6",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    },
+    {
+      "id": "class-7",
+      "name": "Class 7",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    },
+    {
+      "id": "class-8",
+      "name": "Class 8",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    },
+    {
+      "id": "class-9",
+      "name": "Class 9",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    },
+    {
+      "id": "class-10",
+      "name": "Class 10",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    },
+    {
+      "id": "class-11",
+      "name": "Class 11",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    },
+    {
+      "id": "class-12",
+      "name": "Class 12",
+      "description": "Browse available subjects and chapters",
+      "subjects_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/subjects.json"
+    }
+  ]
+}
