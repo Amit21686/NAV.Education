@@ -1,0 +1,4 @@
+{
+  "title": "NAV Education Content",
+  "instructions": "Add subjects to subjects.json. Each subject should have a chapters_url pointing to a JSON file containing a chapters array. Each chapter may include notes_url, quiz_url and lectures."
+}
