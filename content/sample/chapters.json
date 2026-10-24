@@ -1,0 +1,16 @@
+{
+  "chapters": [
+    {
+      "id": "sample-chapter",
+      "title": "Sample Chapter",
+      "notes_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/content/sample/notes.json",
+      "quiz_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/content/sample/quiz.json",
+      "lectures": [
+        {
+          "title": "Add your YouTube lecture",
+          "url": "https://www.youtube.com/"
+        }
+      ]
+    }
+  ]
+}
