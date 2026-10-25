@@ -1,0 +1,11 @@
+{
+  "chapters": [
+    {
+      "id": "chapter-1",
+      "title": "New chapter",
+      "notes_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/content/biology/notes.json",
+      "quiz_url": "https://raw.githubusercontent.com/Amit21686/NAV.Education/main/content/biology/quiz.json",
+      "youtube_url": "https://youtu.be/17W-psxZeYI?si=TusQ8F5LGZh8TOkt"
+    }
+  ]
+}
