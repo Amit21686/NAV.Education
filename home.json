@@ -1,11 +1,11 @@
 {
   "cards": [
     {
-      "id": "Asia political map",
-      "title": "Asia political map",
-      "description": "Learn Asian countries Location",
-      "type": "special",
-      "url": "https://amit21686.github.io/NAV_Education/Asia.html",
+      "id": "classes",
+      "title": "Classes / STD 1–12",
+      "description": "Choose a class and explore its subjects",
+      "type": "classes",
+      "url": "",
       "icon": 59404,
       "colorIndex": 0
     }
