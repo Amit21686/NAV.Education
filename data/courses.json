@@ -1,1 +1,31 @@
-[]
+[
+  {
+    "id": "course-1794991421510",
+    "subjects": [
+      "Biology",
+      "Physics",
+      "Chemistry"
+    ],
+    "title": "Yakeen NEET 2.0",
+    "lessons": 1,
+    "progress": 0,
+    "summary": "Free for all neet aspirants who can't afford.",
+    "chapters": [
+      {
+        "id": "ch-1794991538653",
+        "subject": "Biology",
+        "title": "Sexual Reproduction in Flowering Plants",
+        "description": "Biology video lectures for Sexual Reproduction in Flowering Plants",
+        "lectures": [
+          {
+            "id": "lec-1794991538653",
+            "title": "Lecture 1",
+            "duration": "12:00",
+            "videoUrl": "https://youtu.be/sihrlkcrRg0?si=syvt4P7ifDgm1CbM",
+            "description": "Biology • Sexual Reproduction in Flowering Plants"
+          }
+        ]
+      }
+    ]
+  }
+]
