@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "id": "note-bio-1",
+    "subject": "Biology",
+    "title": "Tapetum & Sporopollenin NCERT Facts",
+    "content": "Cells of tapetum possess dense cytoplasm and generally have more than one nucleus. Pollen grain exine is made of sporopollenin — the most resistant organic material known."
+  },
+  {
+    "id": "note-phy-1",
+    "subject": "Physics",
+    "title": "Gauss Law & Electric Flux",
+    "content": "Total electric flux through any closed surface is equal to 1/ε₀ times the net charge enclosed by the surface (Φ = q_in / ε₀)."
+  },
+  {
+    "id": "note-chem-1",
+    "subject": "Chemistry",
+    "title": "Raoult Law & Azeotropes",
+    "content": "Minimum boiling azeotropes show large positive deviation from Raoult law (e.g. 95% ethanol + water mixture)."
+  }
+]
