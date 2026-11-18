@@ -1,1 +1,28 @@
-[]
+[
+  {
+    "id": "q-neet-1",
+    "subject": "Biology",
+    "question": "Which wall layer of the microsporangium nourishes the developing pollen grains and has multinucleate cells?",
+    "options": [
+      "Epidermis",
+      "Endothecium",
+      "Middle layers",
+      "Tapetum"
+    ],
+    "correctIndex": 3,
+    "explanation": "Tapetum is the innermost wall layer of the microsporangium; its cells have dense cytoplasm and generally have more than one nucleus."
+  },
+  {
+    "id": "q-neet-2",
+    "subject": "Physics",
+    "question": "If the distance between two point charges is doubled and each charge is also doubled, the electrostatic force between them:",
+    "options": [
+      "Remains unchanged",
+      "Becomes double",
+      "Becomes half",
+      "Becomes four times"
+    ],
+    "correctIndex": 0,
+    "explanation": "F = k(2q1)(2q2) / (2r)² = 4kq1q2 / 4r² = F (remains unchanged)."
+  }
+]
