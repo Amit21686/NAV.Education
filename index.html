@@ -1,61 +1,1689 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en" class="dark"><head><script>(function(){
+function slug(s){
+  try{return s.trim().toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu,'').replace(/\s+/g,'-');}
+  catch(e){return s.trim().toLowerCase().replace(/[^a-z0-9\s_-]/g,'').replace(/\s+/g,'-');}
+}
+function findHashTarget(hash){
+  if(!hash||hash==='#')return null;
+  var raw=hash.charAt(0)==='#'?hash.slice(1):hash;
+  var dec=raw;
+  try{dec=decodeURIComponent(raw);}catch(e){}
+  var el=document.getElementById(raw)||document.getElementById(dec);
+  if(el)return el;
+  try{
+    if(typeof CSS!=='undefined'&&CSS.escape){
+      el=document.querySelector('[name="'+CSS.escape(raw)+'"]')||
+         document.querySelector('[name="'+CSS.escape(dec)+'"]');
+    }else{
+      var named=document.getElementsByName(raw);
+      if(named&&named.length>0)return named[0];
+    }
+  }catch(e){}
+  if(el)return el;
+  var targetSlug=slug(dec);
+  if(targetSlug){
+    var headings=document.querySelectorAll('h1,h2,h3,h4,h5,h6');
+    for(var i=0;i<headings.length;i++){
+      if(slug(headings[i].textContent||'')===targetSlug)return headings[i];
+    }
+  }
+  return null;
+}
+function getInPageHash(a,href){
+  if(href.charAt(0)==='#')return href;
+  try{
+    var u=new URL(href,window.location.href);
+    if(u.hash&&u.origin===window.location.origin&&u.pathname===window.location.pathname){
+      return u.hash;
+    }
+  }catch(e){}
+  return null;
+}
+function findAnchor(target){
+  var el=target instanceof Element?target:(target&&target.parentElement?target.parentElement:null);
+  return el&&typeof el.closest==='function'?el.closest('a'):null;
+}
+function configureAnchor(a){
+  var href=a.getAttribute('href');
+  if(!href||href.trim().toLowerCase().indexOf('javascript:')===0||a.hasAttribute('download'))return;
+  if(getInPageHash(a,href)!==null)return;
+  var t=a.getAttribute('target');
+  if(!t||t.toLowerCase()!=='_blank'){a.setAttribute('target','_blank');}
+  if(!a.getAttribute('rel')){a.setAttribute('rel','noopener noreferrer');}
+}
+function configureAllAnchors(){
+  var anchors=document.querySelectorAll('a[href]');
+  for(var i=0;i<anchors.length;i++){configureAnchor(anchors[i]);}
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',configureAllAnchors,{once:true});
+}else{
+  configureAllAnchors();
+}
+document.addEventListener('click',function(event){
+  var a=findAnchor(event.target);
+  if(a)configureAnchor(a);
+},{capture:true});
+document.addEventListener('click',function(event){
+  if(event.defaultPrevented)return;
+  var a=findAnchor(event.target);
+  if(!a)return;
+  var href=a.getAttribute('href');
+  if(!href||href.trim().toLowerCase().indexOf('javascript:')===0||a.hasAttribute('download'))return;
+  var hash=getInPageHash(a,href);
+  if(hash===null)return;
+  event.preventDefault();
+  if(hash==='#'){window.scrollTo({top:0,behavior:'smooth'});return;}
+  var targetEl=findHashTarget(hash);
+  if(targetEl){targetEl.scrollIntoView({behavior:'smooth',block:'start'});}
+});
+})();</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NAV Education</title>
-
+    <title>NAV Education — NEET Study Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        obsidian: '#09090B',
+                        surface: '#111319',
+                        surfaceHover: '#1A1D26',
+                        brandIndigo: '#6366F1',
+                        brandCyan: '#06B6D4',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+        html, body {
+            background-color: #09090B;
+            color: #F8FAFC;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            max-width: 100%;
         }
-
-        .container {
-            text-align: center;
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #09090B; }
+        ::-webkit-scrollbar-thumb { background: #27272A; border-radius: 9999px; }
+        .glass-header {
+            background: rgba(9, 9, 11, 0.94);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
-
-        h1 {
-            margin-bottom: 10px;
-        }
-
-        p {
-            color: #555;
-        }
-
-        a {
-            display: inline-block;
-            margin-top: 15px;
-            padding: 10px 18px;
-            text-decoration: none;
-            background-color: #007bff;
-            color: white;
-            border-radius: 6px;
-        }
-
-        a:hover {
-            background-color: #0056b3;
-        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
-</head>
+<style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:Inter, sans-serif;font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:JetBrains Mono, monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.pointer-events-none{pointer-events:none}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.inset-0{inset:0px}.inset-x-0{left:0px;right:0px}.right-0{right:0px}.top-0{top:0px}.top-10{top:2.5rem}.bottom-4{bottom:1rem}.right-4{right:1rem}.z-10{z-index:10}.z-50{z-index:50}.col-span-2{grid-column:span 2 / span 2}.mx-auto{margin-left:auto;margin-right:auto}.my-1{margin-top:0.25rem;margin-bottom:0.25rem}.mt-0\.5{margin-top:0.125rem}.ml-1{margin-left:0.25rem}.mr-0\.5{margin-right:0.125rem}.mt-1{margin-top:0.25rem}.line-clamp-2{overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}.flex{display:flex}.inline-flex{display:inline-flex}.grid{display:grid}.hidden{display:none}.aspect-video{aspect-ratio:16 / 9}.h-1\.5{height:0.375rem}.h-11{height:2.75rem}.h-2{height:0.5rem}.h-3{height:0.75rem}.h-3\.5{height:0.875rem}.h-4{height:1rem}.h-7{height:1.75rem}.h-8{height:2rem}.h-full{height:100%}.min-h-screen{min-height:100vh}.w-1\.5{width:0.375rem}.w-2{width:0.5rem}.w-3{width:0.75rem}.w-3\.5{width:0.875rem}.w-4{width:1rem}.w-52{width:13rem}.w-7{width:1.75rem}.w-8{width:2rem}.w-full{width:100%}.min-w-0{min-width:0px}.max-w-5xl{max-width:64rem}.max-w-xs{max-width:20rem}.flex-1{flex:1 1 0%}.shrink{flex-shrink:1}.shrink-0{flex-shrink:0}.cursor-pointer{cursor:pointer}.grid-cols-1{grid-template-columns:repeat(1, minmax(0, 1fr))}.grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}.grid-cols-3{grid-template-columns:repeat(3, minmax(0, 1fr))}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.items-center{align-items:center}.justify-end{justify-content:flex-end}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-1{gap:0.25rem}.gap-1\.5{gap:0.375rem}.gap-2{gap:0.5rem}.gap-2\.5{gap:0.625rem}.gap-3{gap:0.75rem}.space-y-1\.5 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.375rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.375rem * var(--tw-space-y-reverse))}.space-y-2 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.5rem * var(--tw-space-y-reverse))}.space-y-2\.5 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.625rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.625rem * var(--tw-space-y-reverse))}.space-y-1 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.25rem * var(--tw-space-y-reverse))}.space-y-3 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.75rem * var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.overflow-x-auto{overflow-x:auto}.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.whitespace-nowrap{white-space:nowrap}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:0.5rem}.rounded-xl{border-radius:0.75rem}.rounded{border-radius:0.25rem}.rounded-2xl{border-radius:1rem}.border{border-width:1px}.border-0{border-width:0px}.border-t{border-top-width:1px}.border-b{border-bottom-width:1px}.border-amber-500\/40{border-color:rgb(245 158 11 / 0.4)}.border-emerald-500\/30{border-color:rgb(16 185 129 / 0.3)}.border-indigo-500\/30{border-color:rgb(99 102 241 / 0.3)}.border-white\/10{border-color:rgb(255 255 255 / 0.1)}.border-white\/15{border-color:rgb(255 255 255 / 0.15)}.border-amber-500\/30{border-color:rgb(245 158 11 / 0.3)}.border-cyan-500\/30{border-color:rgb(6 182 212 / 0.3)}.border-indigo-500\/25{border-color:rgb(99 102 241 / 0.25)}.border-indigo-500\/40{border-color:rgb(99 102 241 / 0.4)}.border-white\/5{border-color:rgb(255 255 255 / 0.05)}.bg-amber-400{--tw-bg-opacity:1;background-color:rgb(251 191 36 / var(--tw-bg-opacity, 1))}.bg-amber-500\/20{background-color:rgb(245 158 11 / 0.2)}.bg-black{--tw-bg-opacity:1;background-color:rgb(0 0 0 / var(--tw-bg-opacity, 1))}.bg-black\/80{background-color:rgb(0 0 0 / 0.8)}.bg-cyan-400{--tw-bg-opacity:1;background-color:rgb(34 211 238 / var(--tw-bg-opacity, 1))}.bg-emerald-400{--tw-bg-opacity:1;background-color:rgb(52 211 153 / var(--tw-bg-opacity, 1))}.bg-emerald-500\/15{background-color:rgb(16 185 129 / 0.15)}.bg-indigo-500{--tw-bg-opacity:1;background-color:rgb(99 102 241 / var(--tw-bg-opacity, 1))}.bg-indigo-500\/15{background-color:rgb(99 102 241 / 0.15)}.bg-obsidian{--tw-bg-opacity:1;background-color:rgb(9 9 11 / var(--tw-bg-opacity, 1))}.bg-surface{--tw-bg-opacity:1;background-color:rgb(17 19 25 / var(--tw-bg-opacity, 1))}.bg-black\/75{background-color:rgb(0 0 0 / 0.75)}.bg-rose-600{--tw-bg-opacity:1;background-color:rgb(225 29 72 / var(--tw-bg-opacity, 1))}.bg-amber-500\/15{background-color:rgb(245 158 11 / 0.15)}.bg-cyan-500{--tw-bg-opacity:1;background-color:rgb(6 182 212 / var(--tw-bg-opacity, 1))}.bg-cyan-500\/15{background-color:rgb(6 182 212 / 0.15)}.bg-emerald-500{--tw-bg-opacity:1;background-color:rgb(16 185 129 / var(--tw-bg-opacity, 1))}.bg-emerald-600{--tw-bg-opacity:1;background-color:rgb(5 150 105 / var(--tw-bg-opacity, 1))}.bg-indigo-500\/10{background-color:rgb(99 102 241 / 0.1)}.bg-rose-500{--tw-bg-opacity:1;background-color:rgb(244 63 94 / var(--tw-bg-opacity, 1))}.bg-transparent{background-color:transparent}.bg-gradient-to-br{background-image:linear-gradient(to bottom right, var(--tw-gradient-stops))}.bg-gradient-to-r{background-image:linear-gradient(to right, var(--tw-gradient-stops))}.from-indigo-500{--tw-gradient-from:#6366f1 var(--tw-gradient-from-position);--tw-gradient-to:rgb(99 102 241 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.from-slate-900{--tw-gradient-from:#0f172a var(--tw-gradient-from-position);--tw-gradient-to:rgb(15 23 42 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.via-obsidian{--tw-gradient-to:rgb(9 9 11 / 0)  var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), #09090B var(--tw-gradient-via-position), var(--tw-gradient-to)}.to-cyan-400{--tw-gradient-to:#22d3ee var(--tw-gradient-to-position)}.to-indigo-950\/60{--tw-gradient-to:rgb(30 27 75 / 0.6) var(--tw-gradient-to-position)}.to-cyan-500{--tw-gradient-to:#06b6d4 var(--tw-gradient-to-position)}.object-contain{object-fit:contain}.object-cover{object-fit:cover}.p-1\.5{padding:0.375rem}.p-4{padding:1rem}.p-2{padding:0.5rem}.p-2\.5{padding:0.625rem}.p-3{padding:0.75rem}.px-0\.5{padding-left:0.125rem;padding-right:0.125rem}.px-1\.5{padding-left:0.375rem;padding-right:0.375rem}.px-2{padding-left:0.5rem;padding-right:0.5rem}.px-2\.5{padding-left:0.625rem;padding-right:0.625rem}.px-3{padding-left:0.75rem;padding-right:0.75rem}.py-0\.5{padding-top:0.125rem;padding-bottom:0.125rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.py-1\.5{padding-top:0.375rem;padding-bottom:0.375rem}.py-2{padding-top:0.5rem;padding-bottom:0.5rem}.py-2\.5{padding-top:0.625rem;padding-bottom:0.625rem}.px-3\.5{padding-left:0.875rem;padding-right:0.875rem}.py-6{padding-top:1.5rem;padding-bottom:1.5rem}.pr-1{padding-right:0.25rem}.pt-12{padding-top:3rem}.pt-1{padding-top:0.25rem}.pb-2{padding-bottom:0.5rem}.pt-0\.5{padding-top:0.125rem}.pt-1\.5{padding-top:0.375rem}.text-left{text-align:left}.text-center{text-align:center}.font-mono{font-family:JetBrains Mono, monospace}.text-\[10px\]{font-size:10px}.text-\[11px\]{font-size:11px}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xs{font-size:0.75rem;line-height:1rem}.font-bold{font-weight:700}.font-medium{font-weight:500}.font-semibold{font-weight:600}.uppercase{text-transform:uppercase}.leading-relaxed{line-height:1.625}.leading-snug{line-height:1.375}.tracking-tight{letter-spacing:-0.025em}.tracking-tighter{letter-spacing:-0.05em}.tracking-wider{letter-spacing:0.05em}.text-amber-300{--tw-text-opacity:1;color:rgb(252 211 77 / var(--tw-text-opacity, 1))}.text-cyan-400{--tw-text-opacity:1;color:rgb(34 211 238 / var(--tw-text-opacity, 1))}.text-emerald-300{--tw-text-opacity:1;color:rgb(110 231 183 / var(--tw-text-opacity, 1))}.text-emerald-400{--tw-text-opacity:1;color:rgb(52 211 153 / var(--tw-text-opacity, 1))}.text-indigo-300{--tw-text-opacity:1;color:rgb(165 180 252 / var(--tw-text-opacity, 1))}.text-indigo-400{--tw-text-opacity:1;color:rgb(129 140 248 / var(--tw-text-opacity, 1))}.text-rose-400{--tw-text-opacity:1;color:rgb(251 113 133 / var(--tw-text-opacity, 1))}.text-slate-200{--tw-text-opacity:1;color:rgb(226 232 240 / var(--tw-text-opacity, 1))}.text-slate-300{--tw-text-opacity:1;color:rgb(203 213 225 / var(--tw-text-opacity, 1))}.text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184 / var(--tw-text-opacity, 1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.text-cyan-300{--tw-text-opacity:1;color:rgb(103 232 249 / var(--tw-text-opacity, 1))}.text-slate-950{--tw-text-opacity:1;color:rgb(2 6 23 / var(--tw-text-opacity, 1))}.placeholder-slate-500::placeholder{--tw-placeholder-opacity:1;color:rgb(100 116 139 / var(--tw-placeholder-opacity, 1))}.opacity-30{opacity:0.3}.shadow-2xl{--tw-shadow:0 25px 50px -12px rgb(0 0 0 / 0.25);--tw-shadow-colored:0 25px 50px -12px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-lg{--tw-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.transition-colors{transition-property:color, background-color, border-color, fill, stroke, -webkit-text-decoration-color;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, -webkit-text-decoration-color;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.transition-all{transition-property:all;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.selection\:bg-indigo-500 *::selection{--tw-bg-opacity:1;background-color:rgb(99 102 241 / var(--tw-bg-opacity, 1))}.selection\:text-white *::selection{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.selection\:bg-indigo-500::selection{--tw-bg-opacity:1;background-color:rgb(99 102 241 / var(--tw-bg-opacity, 1))}.selection\:text-white::selection{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.hover\:border-indigo-500\/40:hover{border-color:rgb(99 102 241 / 0.4)}.hover\:bg-rose-500\/10:hover{background-color:rgb(244 63 94 / 0.1)}.hover\:bg-surfaceHover:hover{--tw-bg-opacity:1;background-color:rgb(26 29 38 / var(--tw-bg-opacity, 1))}.hover\:bg-white\/5:hover{background-color:rgb(255 255 255 / 0.05)}.hover\:bg-rose-500:hover{--tw-bg-opacity:1;background-color:rgb(244 63 94 / var(--tw-bg-opacity, 1))}.hover\:bg-white\/10:hover{background-color:rgb(255 255 255 / 0.1)}.hover\:bg-amber-500\/10:hover{background-color:rgb(245 158 11 / 0.1)}.hover\:bg-cyan-600:hover{--tw-bg-opacity:1;background-color:rgb(8 145 178 / var(--tw-bg-opacity, 1))}.hover\:bg-emerald-500:hover{--tw-bg-opacity:1;background-color:rgb(16 185 129 / var(--tw-bg-opacity, 1))}.hover\:bg-emerald-600:hover{--tw-bg-opacity:1;background-color:rgb(5 150 105 / var(--tw-bg-opacity, 1))}.hover\:bg-indigo-600:hover{--tw-bg-opacity:1;background-color:rgb(79 70 229 / var(--tw-bg-opacity, 1))}.hover\:text-white:hover{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.hover\:underline:hover{-webkit-text-decoration-line:underline;text-decoration-line:underline}.focus\:border-indigo-500:focus{--tw-border-opacity:1;border-color:rgb(99 102 241 / var(--tw-border-opacity, 1))}.focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}.disabled\:opacity-40:disabled{opacity:0.4}@media (min-width: 640px){.sm\:flex{display:flex}.sm\:grid-cols-4{grid-template-columns:repeat(4, minmax(0, 1fr))}.sm\:text-sm{font-size:0.875rem;line-height:1.25rem}}@media (min-width: 768px){.md\:grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}}</style></head>
+<body class="min-h-screen flex flex-col pt-12 selection:bg-indigo-500 selection:text-white">
 
-<body>
-    <div class="container">
-        <h1>NAV Education</h1>
-        <p>Welcome to my study notes</p>
+    <!-- Fixed Compact Top Brand Bar -->
+    <header class="fixed top-0 inset-x-0 z-50 glass-header">
+        <div class="max-w-5xl mx-auto px-3 h-11 flex items-center justify-between gap-2">
+            <button onclick="switchTab('dashboard')" class="flex items-center gap-2 min-w-0 text-left focus:outline-none">
+                <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center shrink-0">
+                    <span class="font-bold text-white text-[10px] tracking-tighter">NAV</span>
+                </div>
+                <span class="text-sm font-bold tracking-tight text-white truncate">NAV Education</span>
+            </button>
 
-        <!-- Example link to another page -->
-        <a href="india.html">Open India Page</a>
+            <div class="relative shrink-0">
+                <button id="hamburger-btn" onclick="toggleHamburgerMenu()" aria-label="Open Navigation Menu" class="w-8 h-8 rounded-lg bg-surface hover:bg-surfaceHover border border-white/10 text-slate-200 flex items-center justify-center transition-colors">
+                    <svg id="hamburger-icon-open" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                    <svg id="hamburger-icon-close" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+
+                <!-- Hamburger Dropdown Menu -->
+                <div id="hamburger-menu" class="absolute right-0 top-10 w-52 bg-surface border border-white/10 rounded-xl shadow-2xl p-1.5 z-50 hidden">
+                    <button onclick="switchTab('dashboard'); closeHamburgerMenu();" id="nav-dashboard" class="nav-btn w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium text-left text-slate-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="layout-grid" aria-hidden="true" class="lucide lucide-layout-grid w-3.5 h-3.5 text-indigo-400"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></svg>
+                        <span>NEET Courses</span>
+                    </button>
+                    <button onclick="switchTab('quizzes'); closeHamburgerMenu();" id="nav-quizzes" class="nav-btn w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-white/5 text-left mt-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check-circle-2" aria-hidden="true" class="lucide lucide-check-circle-2 w-3.5 h-3.5 text-cyan-400"><circle cx="12" cy="12" r="10"></circle><path d="m16 9-5.5 5.5L8 12"></path></svg>
+                        <span>Practice Quiz (+4/-1)</span>
+                    </button>
+                    <button onclick="switchTab('notes'); closeHamburgerMenu();" id="nav-notes" class="nav-btn w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-white/5 text-left mt-0.5">
+                        <span class="flex items-center gap-2.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="book-open" aria-hidden="true" class="lucide lucide-book-open w-3.5 h-3.5 text-emerald-400"><path d="M12 5v16"></path><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"></path></svg>
+                            <span>Study Notes</span>
+                        </span>
+                        <span id="nav-bookmark-badge" class="hidden px-1.5 py-0.5 text-[10px] font-mono bg-amber-500/20 text-amber-300 rounded-full">0</span>
+                    </button>
+                    <button onclick="switchTab('admin'); closeHamburgerMenu();" id="nav-admin" class="nav-btn w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium hover:bg-white/5 text-left mt-0.5 bg-indigo-500/15 text-indigo-300">
+                        <span class="flex items-center gap-2.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="shield-check" aria-hidden="true" class="lucide lucide-shield-check w-3.5 h-3.5 text-indigo-400"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                            <span>Admin Dashboard</span>
+                        </span>
+                        <span id="gh-live-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    </button>
+                    <div class="my-1 border-t border-white/10"></div>
+                    <button onclick="openResetModal(); closeHamburgerMenu();" class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium text-rose-400 hover:bg-rose-500/10 text-left">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="rotate-ccw" aria-hidden="true" class="lucide lucide-rotate-ccw w-3.5 h-3.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                        <span>Reset Progress</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-5xl w-full mx-auto px-3 py-2.5 space-y-2.5">
+
+        <!-- Single-Line Subject Filter & Telemetry Bar -->
+        <section id="global-filter-bar" class="bg-surface border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-between gap-2 overflow-hidden">
+            <div class="flex items-center gap-1 overflow-x-auto no-scrollbar shrink min-w-0">
+                <button onclick="setSubjectFilter('All')" data-filter="All" class="filter-pill px-2.5 py-1 rounded-lg text-[11px] font-medium bg-indigo-500 text-white whitespace-nowrap shrink-0">All</button>
+                <button onclick="setSubjectFilter('Biology')" data-filter="Biology" class="filter-pill px-2 py-1 rounded-lg text-[11px] font-medium bg-obsidian text-slate-300 border border-white/10 flex items-center gap-1 whitespace-nowrap shrink-0">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Biology
+                </button>
+                <button onclick="setSubjectFilter('Physics')" data-filter="Physics" class="filter-pill px-2 py-1 rounded-lg text-[11px] font-medium bg-obsidian text-slate-300 border border-white/10 flex items-center gap-1 whitespace-nowrap shrink-0">
+                    <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>Physics
+                </button>
+                <button onclick="setSubjectFilter('Chemistry')" data-filter="Chemistry" class="filter-pill px-2 py-1 rounded-lg text-[11px] font-medium bg-obsidian text-slate-300 border border-white/10 flex items-center gap-1 whitespace-nowrap shrink-0">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Chemistry
+                </button>
+            </div>
+            <div class="hidden sm:flex items-center gap-3 shrink-0 font-mono text-[11px] text-slate-400 pr-1">
+                <span>Courses: <strong id="stat-courses-count" class="text-white">1</strong></span>
+                <span>Best: <strong id="stat-best-score" class="text-cyan-400">--</strong></span>
+            </div>
+        </section>
+
+        <!-- TAB 1: DASHBOARD (Courses -> Chapters -> Lectures -> Study Player) -->
+        <section id="tab-dashboard" class="space-y-2.5 hidden">
+
+            <!-- LEVEL 1: NEET Courses Grid -->
+            <div id="level-courses" class="space-y-2">
+                <div class="flex items-center justify-between px-0.5">
+                    <h2 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">NEET Courses</h2>
+                    <span id="course-filter-indicator" class="text-[11px] font-mono text-slate-400">All Subjects</span>
+                </div>
+                <div id="courses-grid" class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                <div onclick="openCourse('course-1794991421510')" class="cursor-pointer bg-surface hover:bg-surfaceHover border border-white/10 hover:border-indigo-500/40 rounded-xl p-3 transition-all flex flex-col justify-between gap-2.5">
+                    <div class="space-y-1">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Bio • Phy • Chem</span>
+                            <span class="font-mono text-[11px] text-slate-400">1 Chapters</span>
+                        </div>
+                        <h3 class="text-sm font-bold text-white leading-snug">Yakeen NEET 2.0</h3>
+                        <p class="text-xs text-slate-400 line-clamp-2">Free for all neet aspirants who can't afford.</p>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex items-center justify-between text-[11px] font-mono">
+                            <span class="text-slate-400">0/1 Lectures</span>
+                            <span class="text-cyan-400 font-semibold">0%</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-obsidian rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full" style="width:0%"></div>
+                        </div>
+                    </div>
+                </div></div>
+            </div>
+
+            <!-- LEVEL 2: Chapters View -->
+            <div id="level-chapters" class="hidden space-y-2">
+                <div class="bg-surface border border-white/10 rounded-xl px-2.5 py-2 flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <button onclick="backToCourses()" class="px-2 py-1 rounded-lg bg-obsidian border border-white/10 text-[11px] font-medium text-slate-200 hover:bg-white/5 flex items-center gap-1 shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="arrow-left" aria-hidden="true" class="lucide lucide-arrow-left w-3 h-3"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+                            <span>Courses</span>
+                        </button>
+                        <h2 id="chapters-course-title" class="text-xs font-semibold text-white truncate">Course Chapters</h2>
+                    </div>
+                    <span id="chapters-subject-pill" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 whitespace-nowrap shrink-0">Bio • Phy • Chem</span>
+                </div>
+                <div id="chapters-list" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div>
+            </div>
+
+            <!-- LEVEL 3: Lectures View -->
+            <div id="level-lectures" class="hidden space-y-2">
+                <div class="bg-surface border border-white/10 rounded-xl px-2.5 py-2 flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <button onclick="backToChapters()" class="px-2 py-1 rounded-lg bg-obsidian border border-white/10 text-[11px] font-medium text-slate-200 hover:bg-white/5 flex items-center gap-1 shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="arrow-left" aria-hidden="true" class="lucide lucide-arrow-left w-3 h-3"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+                            <span>Chapters</span>
+                        </button>
+                        <h2 id="lectures-chapter-title" class="text-xs font-semibold text-white truncate">Chapter Lectures</h2>
+                    </div>
+                    <span id="lectures-progress-pill" class="font-mono text-[11px] text-cyan-400 shrink-0">0/0</span>
+                </div>
+                <div id="lectures-list" class="space-y-1.5"></div>
+            </div>
+
+            <!-- LEVEL 4: Study Video Player -->
+            <div id="level-player" class="hidden space-y-2">
+                <!-- Compact Back & Chapter Strip -->
+                <div class="bg-surface border border-white/10 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2">
+                    <button onclick="backToLectures()" class="px-2 py-1 rounded-lg bg-obsidian border border-white/10 text-[11px] font-medium text-slate-200 hover:bg-white/5 flex items-center gap-1 shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="arrow-left" aria-hidden="true" class="lucide lucide-arrow-left w-3 h-3"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+                        <span>Lectures</span>
+                    </button>
+                    <span id="player-chapter-label" class="text-xs font-medium text-slate-300 truncate">Chapter</span>
+                    <span id="player-subject-badge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">Biology</span>
+                </div>
+
+                <!-- Video Container Card -->
+                <div class="bg-surface border border-white/10 rounded-xl overflow-hidden">
+                    <div id="video-stage" class="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden">
+                        <!-- HTML5 Native Video -->
+                        <video id="native-video-player" class="hidden w-full h-full object-contain bg-black" controls="" playsinline=""></video>
+
+                        <!-- YouTube Local/Sandbox Fallback Card -->
+                        <div id="yt-player-card" class="hidden relative w-full h-full flex flex-col items-center justify-center p-4 text-center bg-gradient-to-br from-slate-900 via-obsidian to-indigo-950/60">
+                            <img id="yt-thumb-bg" src="" alt="" class="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none" onerror="this.style.display='none'" style="display: none;">
+                            <div class="relative z-10 max-w-xs space-y-2">
+                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/80 border border-amber-500/40 text-[10px] text-amber-300 font-medium">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                    <span id="yt-status-text">Local/Sandbox mode — YouTube embeds require HTTPS</span>
+                                </div>
+                                <h4 id="yt-card-title" class="text-xs sm:text-sm font-semibold text-white line-clamp-2">Video Lecture</h4>
+                                <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+                                    <a id="yt-external-link" href="#" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="external-link" aria-hidden="true" class="lucide lucide-external-link w-3.5 h-3.5"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+                                        <span>Watch on YouTube</span>
+                                    </a>
+                                    <button onclick="forceLoadYouTubeEmbed()" class="px-2.5 py-1.5 rounded-lg bg-black/75 hover:bg-white/10 border border-white/15 text-slate-200 text-[11px] font-medium">
+                                        Try Embed
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Standard Iframe (used on real http:// or https:// origins) -->
+                        <iframe id="iframe-video-player" class="hidden w-full h-full border-0" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen=""></iframe>
+                    </div>
+
+                    <!-- Study Controls Bar -->
+                    <div class="p-2.5 space-y-2 border-t border-white/10">
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 id="player-lecture-title" class="text-xs sm:text-sm font-bold text-white truncate">Lecture Title</h3>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <button id="btn-mark-lecture-done" onclick="toggleCurrentLectureComplete()" class="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check-circle-2" aria-hidden="true" class="lucide lucide-check-circle-2 w-3.5 h-3.5"><circle cx="12" cy="12" r="10"></circle><path d="m16 9-5.5 5.5L8 12"></path></svg>
+                                    <span>Done</span>
+                                </button>
+                                <button id="btn-prev-lecture" onclick="navigateLecture(-1)" class="px-2 py-1 rounded-lg bg-obsidian border border-white/10 text-[11px] text-slate-300 hover:bg-white/5 disabled:opacity-40">Prev</button>
+                                <button id="btn-next-lecture" onclick="navigateLecture(1)" class="px-2 py-1 rounded-lg bg-indigo-500 text-white text-[11px] font-medium hover:bg-indigo-600 disabled:opacity-40">Next</button>
+                            </div>
+                        </div>
+
+                        <!-- Native Video Speed & Seek Controls (Visible when HTML5 Video is active) -->
+                        <div id="native-study-toolbar" class="hidden flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-white/5">
+                            <div class="flex items-center gap-1">
+                                <button onclick="seekVideo(-10)" class="px-2 py-1 rounded bg-obsidian border border-white/10 text-[10px] font-mono text-slate-300 hover:text-white">-10s</button>
+                                <button onclick="seekVideo(10)" class="px-2 py-1 rounded bg-obsidian border border-white/10 text-[10px] font-mono text-slate-300 hover:text-white">+10s</button>
+                                <button onclick="toggleVideoPip()" class="px-2 py-1 rounded bg-obsidian border border-white/10 text-[10px] font-mono text-slate-300 hover:text-white">PiP</button>
+                                <button onclick="toggleVideoFullscreen()" class="px-2 py-1 rounded bg-obsidian border border-white/10 text-[10px] font-mono text-slate-300 hover:text-white">Full</button>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-[10px] text-slate-400 mr-0.5">Speed:</span>
+                                <button onclick="setPlaybackSpeed(0.75)" data-speed="0.75" class="speed-pill px-1.5 py-0.5 rounded text-[10px] font-mono bg-obsidian text-slate-400 border border-white/10">0.75x</button>
+                                <button onclick="setPlaybackSpeed(1)" data-speed="1" class="speed-pill px-1.5 py-0.5 rounded text-[10px] font-mono bg-indigo-500 text-white">1x</button>
+                                <button onclick="setPlaybackSpeed(1.25)" data-speed="1.25" class="speed-pill px-1.5 py-0.5 rounded text-[10px] font-mono bg-obsidian text-slate-400 border border-white/10">1.25x</button>
+                                <button onclick="setPlaybackSpeed(1.5)" data-speed="1.5" class="speed-pill px-1.5 py-0.5 rounded text-[10px] font-mono bg-obsidian text-slate-400 border border-white/10">1.5x</button>
+                                <button onclick="setPlaybackSpeed(2)" data-speed="2" class="speed-pill px-1.5 py-0.5 rounded text-[10px] font-mono bg-obsidian text-slate-400 border border-white/10">2x</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Timestamped Lecture Notes -->
+                <div class="bg-surface border border-white/10 rounded-xl p-2.5 space-y-2">
+                    <div class="flex items-center gap-1.5">
+                        <input id="lecture-note-input" type="text" placeholder="Stamp key NCERT line or formula..." class="flex-1 min-w-0 bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                        <button onclick="addTimestampedNote()" class="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-slate-950 text-xs font-semibold shrink-0">Save</button>
+                    </div>
+                    <div id="lecture-notes-list" class="space-y-1"></div>
+                </div>
+
+                <!-- Compact Chapter Playlist -->
+                <div class="bg-surface border border-white/10 rounded-xl p-2.5 space-y-1.5">
+                    <div class="flex items-center justify-between gap-2">
+                        <h4 id="player-playlist-chapter" class="text-xs font-semibold text-white truncate">Chapter Playlist</h4>
+                        <span id="player-playlist-count" class="font-mono text-[11px] text-slate-400 shrink-0">0/0</span>
+                    </div>
+                    <div id="player-playlist-items" class="space-y-1"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: PRACTICE QUIZZES (+4 / -1 / 0) -->
+        <section id="tab-quizzes" class="hidden space-y-2.5">
+            <div class="bg-surface border border-white/10 rounded-xl p-3 space-y-2.5">
+                <div class="flex items-center justify-between gap-2 border-b border-white/10 pb-2">
+                    <div class="flex items-center gap-2">
+                        <span id="quiz-q-counter" class="font-mono text-xs font-semibold text-indigo-400">Q 1 / 1</span>
+                        <span id="quiz-subject-badge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300">Biology</span>
+                    </div>
+                    <div class="flex items-center gap-2 font-mono text-xs">
+                        <span class="text-slate-400">Score: <strong id="quiz-live-score" class="text-white">0</strong></span>
+                        <button onclick="restartQuiz()" class="px-2 py-1 rounded bg-obsidian border border-white/10 text-[10px] text-slate-300 hover:text-white">Restart</button>
+                    </div>
+                </div>
+
+                <div id="quiz-empty-state" class="hidden py-6 text-center text-xs text-slate-400">
+                    No quiz questions available for this subject filter. Load the starter template or add questions in Admin Dashboard.
+                </div>
+
+                <div id="quiz-active-box" class="space-y-2.5">
+                    <p id="quiz-question-text" class="text-xs sm:text-sm font-medium text-white leading-relaxed"></p>
+                    <div id="quiz-options-container" class="space-y-1.5"></div>
+                    <div id="quiz-explanation-box" class="hidden p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/25 text-xs text-slate-200"></div>
+                    <div class="flex items-center justify-between pt-1">
+                        <button id="btn-quiz-prev" onclick="moveQuizQuestion(-1)" class="px-3 py-1.5 rounded-lg bg-obsidian border border-white/10 text-xs text-slate-300">Prev</button>
+                        <button id="btn-quiz-next" onclick="moveQuizQuestion(1)" class="px-3 py-1.5 rounded-lg bg-indigo-500 text-white text-xs font-semibold">Next</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: STUDY NOTES -->
+        <section id="tab-notes" class="hidden space-y-2.5">
+            <div class="bg-surface border border-white/10 rounded-xl p-2 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="search" aria-hidden="true" class="lucide lucide-search w-3.5 h-3.5 text-slate-400 ml-1 shrink-0"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg>
+                <input id="notes-search-input" oninput="renderNotes()" type="text" placeholder="Search NCERT revision notes..." class="flex-1 min-w-0 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none">
+                <button id="btn-toggle-bookmarks" onclick="toggleBookmarksFilter()" class="px-2.5 py-1 rounded-lg bg-obsidian border border-white/10 text-[11px] text-slate-300 shrink-0">Saved</button>
+            </div>
+            <div id="notes-grid" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div>
+        </section>
+
+        <!-- TAB 4: ADMIN DASHBOARD (GitHub CMS for Amit21686/NAV.Education) -->
+        <section id="tab-admin" class="space-y-2.5">
+            <div class="bg-surface border border-white/10 rounded-xl p-3 space-y-2.5">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-1.5">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 whitespace-nowrap">GITHUB CMS</span>
+                            <a href="https://github.com/Amit21686/NAV.Education" target="_blank" rel="noopener noreferrer" class="text-[11px] font-mono text-slate-300 hover:text-white truncate">Amit21686/NAV.Education ↗</a>
+                        </div>
+                        <h2 class="text-sm font-bold text-white mt-1">Admin Content &amp; GitHub Deploy</h2>
+                    </div>
+                    <span id="pat-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap shrink-0">PAT Saved</span>
+                </div>
+
+                <!-- One-time PAT Input -->
+                <div class="flex items-center gap-1.5">
+                    <input id="admin-pat-input" type="password" placeholder="Paste GitHub PAT once to push &amp; deploy..." class="flex-1 min-w-0 bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" value="">
+                    <button onclick="saveAdminPat()" class="px-2.5 py-1.5 rounded-lg bg-obsidian border border-white/15 text-xs font-medium text-slate-200 hover:bg-white/5 shrink-0">Save PAT</button>
+                </div>
+
+                <!-- Sync & Deploy Action Buttons -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    <button onclick="syncFromBuiltInGithub(false)" class="px-2.5 py-2 rounded-lg bg-obsidian border border-white/10 hover:bg-white/5 text-xs font-medium text-cyan-300 flex items-center justify-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="refresh-cw" aria-hidden="true" class="lucide lucide-refresh-cw w-3.5 h-3.5 shrink-0"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg>
+                        <span class="truncate">Fetch Repo</span>
+                    </button>
+                    <button onclick="loadStarterTemplate()" class="px-2.5 py-2 rounded-lg bg-obsidian border border-amber-500/30 hover:bg-amber-500/10 text-xs font-medium text-amber-300 flex items-center justify-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="sparkles" aria-hidden="true" class="lucide lucide-sparkles w-3.5 h-3.5 shrink-0"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path d="M20 2v4"></path><path d="M22 4h-4"></path><circle cx="4" cy="20" r="2"></circle></svg>
+                        <span class="truncate">NEET Starter</span>
+                    </button>
+                    <button id="btn-push-github" onclick="pushAllToBuiltInGithub()" class="px-2.5 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="upload-cloud" aria-hidden="true" class="lucide lucide-upload-cloud w-3.5 h-3.5 shrink-0"><path d="M12 13v8"></path><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="m8 17 4-4 4 4"></path></svg>
+                        <span class="truncate">Push Data</span>
+                    </button>
+                    <button id="btn-deploy-app" onclick="deployAppHtmlToGithub()" class="px-2.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5" disabled="">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="rocket" aria-hidden="true" class="lucide lucide-rocket w-3.5 h-3.5 shrink-0"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"></path><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"></path><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"></path></svg>
+                        <span class="truncate">Deploy App</span>
+                    </button>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                    <p id="admin-sync-log" class="text-[11px] font-mono text-slate-400">Deploying index.html to Amit21686/NAV.Education...</p>
+                    <a href="https://amit21686.github.io/NAV.Education/" target="_blank" rel="noopener noreferrer" class="text-[11px] font-mono text-emerald-400 hover:underline">amit21686.github.io/NAV.Education ↗</a>
+                </div>
+            </div>
+
+            <!-- Admin Forms Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                <!-- 1. Add NEET Course -->
+                <div class="bg-surface border border-white/10 rounded-xl p-3 space-y-2">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">1. Add NEET Course</h3>
+                    <input id="adm-course-title" type="text" placeholder="Course Title (e.g. Yakeen NEET 2.0)" class="w-full bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500">
+                    <input id="adm-course-desc" type="text" placeholder="Short description (Bio + Phy + Chem)" class="w-full bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500">
+                    <button onclick="adminAddCourse()" class="w-full py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold">+ Add Course</button>
+                </div>
+
+                <!-- 2. Add Chapter & Video Lecture (With Available Chapter Selector) -->
+                <div class="bg-surface border border-white/10 rounded-xl p-3 space-y-2">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">2. Add Chapter &amp; Video Lecture</h3>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <select id="adm-lec-course" onchange="populateAdminChapterDropdown()" class="bg-obsidian border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white"><option value="course-1794991421510">Yakeen NEET 2.0</option></select>
+                        <select id="adm-lec-subject" onchange="populateAdminChapterDropdown()" class="bg-obsidian border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white">
+                            <option value="Biology">Biology</option>
+                            <option value="Physics">Physics</option>
+                            <option value="Chemistry">Chemistry</option>
+                        </select>
+                    </div>
+                    <select id="adm-lec-chapter-select" onchange="handleAdminChapterSelectChange()" class="w-full bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300"><option value="__NEW__">+ Create New Chapter...</option><option value="ch-1794991538653">Sexual Reproduction in Flowering Plants (1 lectures)</option></select>
+                    <input id="adm-lec-chapter" type="text" placeholder="New Chapter Name (e.g. Human Reproduction)" class="w-full bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500">
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <input id="adm-lec-title" type="text" placeholder="Lecture Title" class="col-span-2 bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500">
+                        <input id="adm-lec-duration" type="text" placeholder="45:00" class="bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500">
+                    </div>
+                    <input id="adm-lec-url" type="text" placeholder="YouTube URL or Direct .mp4 Video URL" class="w-full bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500">
+                    <button onclick="adminAddLecture()" class="w-full py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-slate-950 text-xs font-semibold">+ Add Lecture</button>
+                </div>
+
+                <!-- 3. Add Study Note -->
+                <div class="bg-surface border border-white/10 rounded-xl p-3 space-y-2">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">3. Add NCERT Revision Note</h3>
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <select id="adm-note-subject" class="bg-obsidian border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white">
+                            <option value="Biology">Biology</option>
+                            <option value="Physics">Physics</option>
+                            <option value="Chemistry">Chemistry</option>
+                        </select>
+                        <input id="adm-note-title" type="text" placeholder="Note Title" class="col-span-2 bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500">
+                    </div>
+                    <textarea id="adm-note-content" rows="2" placeholder="Key NCERT points, formulas, or exceptions..." class="w-full bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500"></textarea>
+                    <button onclick="adminAddNote()" class="w-full py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-semibold">+ Add Note</button>
+                </div>
+
+                <!-- 4. Add NEET MCQ -->
+                <div class="bg-surface border border-white/10 rounded-xl p-3 space-y-2">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">4. Add NEET MCQ (+4/-1)</h3>
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <select id="adm-q-subject" class="bg-obsidian border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white">
+                            <option value="Biology">Biology</option>
+                            <option value="Physics">Physics</option>
+                            <option value="Chemistry">Chemistry</option>
+                        </select>
+                        <input id="adm-q-text" type="text" placeholder="Question statement..." class="col-span-2 bg-obsidian border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <input id="adm-q-opt0" type="text" placeholder="Option A" class="bg-obsidian border border-white/10 rounded-lg px-2 py-1 text-xs text-white placeholder-slate-500">
+                        <input id="adm-q-opt1" type="text" placeholder="Option B" class="bg-obsidian border border-white/10 rounded-lg px-2 py-1 text-xs text-white placeholder-slate-500">
+                        <input id="adm-q-opt2" type="text" placeholder="Option C" class="bg-obsidian border border-white/10 rounded-lg px-2 py-1 text-xs text-white placeholder-slate-500">
+                        <input id="adm-q-opt3" type="text" placeholder="Option D" class="bg-obsidian border border-white/10 rounded-lg px-2 py-1 text-xs text-white placeholder-slate-500">
+                    </div>
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <select id="adm-q-correct" class="bg-obsidian border border-white/10 rounded-lg px-2 py-1 text-xs text-white">
+                            <option value="0">Ans: A</option>
+                            <option value="1">Ans: B</option>
+                            <option value="2">Ans: C</option>
+                            <option value="3">Ans: D</option>
+                        </select>
+                        <input id="adm-q-exp" type="text" placeholder="NCERT Explanation" class="col-span-2 bg-obsidian border border-white/10 rounded-lg px-2 py-1 text-xs text-white placeholder-slate-500">
+                    </div>
+                    <button onclick="adminAddQuestion()" class="w-full py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold">+ Add MCQ</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Reset Modal -->
+    <div id="reset-modal" class="hidden fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4">
+        <div class="bg-surface border border-white/10 rounded-2xl max-w-xs w-full p-4 space-y-3">
+            <h3 class="text-sm font-bold text-white">Reset Local Study Progress?</h3>
+            <p class="text-xs text-slate-400">This clears completed lectures, quiz answers, and local lecture notes. GitHub repo data stays intact.</p>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeResetModal()" class="px-3 py-1.5 rounded-lg bg-obsidian border border-white/10 text-xs text-slate-300">Cancel</button>
+                <button onclick="confirmResetProgress()" class="px-3 py-1.5 rounded-lg bg-rose-500 text-white text-xs font-semibold">Reset</button>
+            </div>
+        </div>
     </div>
-</body>
-</html>
+
+    <!-- Toast Message Box -->
+    <div id="toast-box" class="fixed bottom-4 right-4 z-50 bg-surface border border-indigo-500/40 text-white px-3.5 py-2 rounded-xl shadow-2xl text-xs font-medium flex items-center gap-2 hidden">
+        <span id="toast-dot" class="w-2 h-2 rounded-full bg-cyan-400"></span>
+        <span id="toast-msg">GitHub PAT saved locally</span>
+    </div>
+
+    <script>
+        // Built-In GitHub CMS Target
+        const GITHUB_CONFIG = {
+            owner: 'Amit21686',
+            repo: 'NAV.Education',
+            branch: 'main'
+        };
+
+        // Application State
+        let appState = {
+            activeTab: 'dashboard',
+            subjectFilter: 'All',
+            bookmarksOnly: false,
+            courses: [],
+            notes: [],
+            quizzes: [],
+            selectedCourseId: null,
+            selectedChapterId: null,
+            selectedLectureId: null,
+            completedLectures: [],
+            lectureNotes: {},
+            bookmarkedNotes: [],
+            quizIndex: 0,
+            quizAnswers: {},
+            bestQuizScore: null
+        };
+
+        let currentYouTubeId = null;
+
+        function showToast(msg, isError = false) {
+            const box = document.getElementById('toast-box');
+            const dot = document.getElementById('toast-dot');
+            const text = document.getElementById('toast-msg');
+            if (!box || !text) return;
+            text.textContent = msg;
+            dot.className = `w-2 h-2 rounded-full ${isError ? 'bg-rose-400' : 'bg-cyan-400'}`;
+            box.classList.remove('hidden');
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => box.classList.add('hidden'), 3200);
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem('nav_edu_state_v5', JSON.stringify(appState));
+            } catch (e) {}
+        }
+
+        // Hamburger Menu Controls
+        function toggleHamburgerMenu() {
+            const menu = document.getElementById('hamburger-menu');
+            const openIcon = document.getElementById('hamburger-icon-open');
+            const closeIcon = document.getElementById('hamburger-icon-close');
+            if (menu.classList.contains('hidden')) {
+                menu.classList.remove('hidden');
+                openIcon.classList.add('hidden');
+                closeIcon.classList.remove('hidden');
+            } else {
+                closeHamburgerMenu();
+            }
+        }
+
+        function closeHamburgerMenu() {
+            const menu = document.getElementById('hamburger-menu');
+            const openIcon = document.getElementById('hamburger-icon-open');
+            const closeIcon = document.getElementById('hamburger-icon-close');
+            if (menu) menu.classList.add('hidden');
+            if (openIcon) openIcon.classList.remove('hidden');
+            if (closeIcon) closeIcon.classList.add('hidden');
+        }
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('hamburger-menu');
+            const btn = document.getElementById('hamburger-btn');
+            if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
+                closeHamburgerMenu();
+            }
+        });
+
+        // Navigation & Tab Switching
+        function switchTab(tab) {
+            appState.activeTab = tab;
+            ['dashboard', 'quizzes', 'notes', 'admin'].forEach(t => {
+                const sec = document.getElementById(`tab-${t}`);
+                const nav = document.getElementById(`nav-${t}`);
+                if (sec) sec.classList.toggle('hidden', t !== tab);
+                if (nav) {
+                    if (t === tab) {
+                        nav.classList.add('bg-indigo-500/15', 'text-indigo-300');
+                        nav.classList.remove('text-slate-300');
+                    } else {
+                        nav.classList.remove('bg-indigo-500/15', 'text-indigo-300');
+                        nav.classList.add('text-slate-300');
+                    }
+                }
+            });
+
+            if (tab === 'dashboard') {
+                backToCourses();
+            } else if (tab === 'quizzes') {
+                renderQuiz();
+            } else if (tab === 'notes') {
+                renderNotes();
+            } else if (tab === 'admin') {
+                populateAdminSelectors();
+            }
+            saveState();
+        }
+
+        // Subject Filter
+        function setSubjectFilter(subj) {
+            appState.subjectFilter = subj;
+            document.querySelectorAll('.filter-pill').forEach(btn => {
+                const active = btn.getAttribute('data-filter') === subj;
+                btn.className = active
+                    ? 'filter-pill px-2.5 py-1 rounded-lg text-[11px] font-medium bg-indigo-500 text-white whitespace-nowrap shrink-0'
+                    : 'filter-pill px-2 py-1 rounded-lg text-[11px] font-medium bg-obsidian text-slate-300 border border-white/10 flex items-center gap-1 whitespace-nowrap shrink-0';
+            });
+            const ind = document.getElementById('course-filter-indicator');
+            if (ind) ind.textContent = subj === 'All' ? 'All Subjects' : subj;
+
+            if (appState.activeTab === 'dashboard') {
+                if (appState.selectedCourseId && !appState.selectedChapterId) {
+                    renderChaptersView();
+                } else if (!appState.selectedCourseId) {
+                    renderCourses();
+                }
+            } else if (appState.activeTab === 'quizzes') {
+                appState.quizIndex = 0;
+                renderQuiz();
+            } else if (appState.activeTab === 'notes') {
+                renderNotes();
+            }
+            saveState();
+        }
+
+        function getSubjectBadgeClass(subj) {
+            if (subj === 'Biology') return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+            if (subj === 'Physics') return 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30';
+            if (subj === 'Chemistry') return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+            return 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
+        }
+
+        // LEVEL 1: Render NEET Courses
+        function renderCourses() {
+            const grid = document.getElementById('courses-grid');
+            const countEl = document.getElementById('stat-courses-count');
+            if (countEl) countEl.textContent = appState.courses.length;
+
+            if (!appState.courses.length) {
+                grid.innerHTML = `
+                    <div class="col-span-full bg-surface border border-white/10 rounded-xl p-5 text-center space-y-2">
+                        <p class="text-xs text-slate-300 font-medium">No NEET courses loaded yet from Amit21686/NAV.Education.</p>
+                        <button onclick="switchTab('admin')" class="px-3 py-1.5 rounded-lg bg-indigo-500 text-white text-xs font-semibold">Open Admin Dashboard</button>
+                    </div>`;
+                return;
+            }
+
+            grid.innerHTML = appState.courses.map(course => {
+                const chapters = course.chapters || [];
+                const totalLectures = chapters.reduce((acc, ch) => acc + (ch.lectures ? ch.lectures.length : 0), 0);
+                const doneLectures = chapters.reduce((acc, ch) => acc + (ch.lectures ? ch.lectures.filter(l => appState.completedLectures.includes(l.id)).length : 0), 0);
+                const pct = totalLectures > 0 ? Math.round((doneLectures / totalLectures) * 100) : 0;
+                const descText = course.description || course.summary || 'Complete NCERT + PYQ NEET preparation module.';
+
+                return `
+                <div onclick="openCourse('${course.id}')" class="cursor-pointer bg-surface hover:bg-surfaceHover border border-white/10 hover:border-indigo-500/40 rounded-xl p-3 transition-all flex flex-col justify-between gap-2.5">
+                    <div class="space-y-1">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Bio • Phy • Chem</span>
+                            <span class="font-mono text-[11px] text-slate-400">${chapters.length} Chapters</span>
+                        </div>
+                        <h3 class="text-sm font-bold text-white leading-snug">${course.title}</h3>
+                        <p class="text-xs text-slate-400 line-clamp-2">${descText}</p>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex items-center justify-between text-[11px] font-mono">
+                            <span class="text-slate-400">${doneLectures}/${totalLectures} Lectures</span>
+                            <span class="text-cyan-400 font-semibold">${pct}%</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-obsidian rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full" style="width:${pct}%"></div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function openCourse(courseId) {
+            appState.selectedCourseId = courseId;
+            appState.selectedChapterId = null;
+            appState.selectedLectureId = null;
+            document.getElementById('level-courses').classList.add('hidden');
+            document.getElementById('level-lectures').classList.add('hidden');
+            document.getElementById('level-player').classList.add('hidden');
+            document.getElementById('level-chapters').classList.remove('hidden');
+            renderChaptersView();
+        }
+
+        function backToCourses() {
+            appState.selectedCourseId = null;
+            appState.selectedChapterId = null;
+            appState.selectedLectureId = null;
+            stopVideoPlayback();
+            document.getElementById('level-chapters').classList.add('hidden');
+            document.getElementById('level-lectures').classList.add('hidden');
+            document.getElementById('level-player').classList.add('hidden');
+            document.getElementById('level-courses').classList.remove('hidden');
+            renderCourses();
+        }
+
+        // LEVEL 2: Render Chapters inside Selected Course
+        function renderChaptersView() {
+            const course = appState.courses.find(c => c.id === appState.selectedCourseId);
+            if (!course) return backToCourses();
+
+            document.getElementById('chapters-course-title').textContent = course.title;
+            document.getElementById('chapters-subject-pill').textContent = appState.subjectFilter === 'All' ? 'Bio • Phy • Chem' : appState.subjectFilter;
+
+            const allChapters = course.chapters || [];
+            const filtered = appState.subjectFilter === 'All'
+                ? allChapters
+                : allChapters.filter(ch => (ch.subject || 'Biology') === appState.subjectFilter);
+
+            const listEl = document.getElementById('chapters-list');
+            if (!filtered.length) {
+                listEl.innerHTML = `<div class="col-span-full bg-surface border border-white/10 rounded-xl p-4 text-center text-xs text-slate-400">No chapters found for ${appState.subjectFilter} in this course.</div>`;
+                return;
+            }
+
+            listEl.innerHTML = filtered.map((ch, idx) => {
+                const lectures = ch.lectures || [];
+                const done = lectures.filter(l => appState.completedLectures.includes(l.id)).length;
+                const subj = ch.subject || 'Biology';
+                return `
+                <div onclick="openChapter('${ch.id}')" class="cursor-pointer bg-surface hover:bg-surfaceHover border border-white/10 hover:border-cyan-500/40 rounded-xl p-3 flex items-center justify-between gap-2.5 transition-all">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-7 h-7 rounded-lg bg-obsidian border border-white/10 flex items-center justify-center font-mono text-xs font-bold text-indigo-400 shrink-0">${idx + 1}</div>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5">
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border ${getSubjectBadgeClass(subj)}">${subj}</span>
+                                <span class="font-mono text-[10px] text-slate-400">${done}/${lectures.length} Done</span>
+                            </div>
+                            <h4 class="text-xs sm:text-sm font-semibold text-white truncate mt-0.5">${ch.title}</h4>
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                </div>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function openChapter(chapterId) {
+            appState.selectedChapterId = chapterId;
+            appState.selectedLectureId = null;
+            stopVideoPlayback();
+            document.getElementById('level-chapters').classList.add('hidden');
+            document.getElementById('level-player').classList.add('hidden');
+            document.getElementById('level-lectures').classList.remove('hidden');
+            renderLecturesView();
+        }
+
+        function backToChapters() {
+            appState.selectedChapterId = null;
+            appState.selectedLectureId = null;
+            stopVideoPlayback();
+            document.getElementById('level-lectures').classList.add('hidden');
+            document.getElementById('level-player').classList.add('hidden');
+            document.getElementById('level-chapters').classList.remove('hidden');
+            renderChaptersView();
+        }
+
+        // LEVEL 3: Render Video Lectures inside Selected Chapter
+        function renderLecturesView() {
+            const course = appState.courses.find(c => c.id === appState.selectedCourseId);
+            const chapter = course ? (course.chapters || []).find(ch => ch.id === appState.selectedChapterId) : null;
+            if (!chapter) return backToChapters();
+
+            const lectures = chapter.lectures || [];
+            const done = lectures.filter(l => appState.completedLectures.includes(l.id)).length;
+            document.getElementById('lectures-chapter-title').textContent = chapter.title;
+            document.getElementById('lectures-progress-pill').textContent = `${done}/${lectures.length} Done`;
+
+            const listEl = document.getElementById('lectures-list');
+            if (!lectures.length) {
+                listEl.innerHTML = `<div class="bg-surface border border-white/10 rounded-xl p-4 text-center text-xs text-slate-400">No video lectures added to this chapter yet.</div>`;
+                return;
+            }
+
+            listEl.innerHTML = lectures.map((lec, idx) => {
+                const isDone = appState.completedLectures.includes(lec.id);
+                return `
+                <div onclick="playVideoLecture('${lec.id}')" class="cursor-pointer bg-surface hover:bg-surfaceHover border ${isDone ? 'border-emerald-500/30' : 'border-white/10'} rounded-xl px-3 py-2.5 flex items-center justify-between gap-2.5 transition-all">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-7 h-7 rounded-lg ${isDone ? 'bg-emerald-500/20 text-emerald-300' : 'bg-indigo-500/20 text-indigo-300'} flex items-center justify-center shrink-0">
+                            <i data-lucide="${isDone ? 'check' : 'play'}" class="w-3.5 h-3.5"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <h4 class="text-xs sm:text-sm font-semibold text-white truncate">${idx + 1}. ${lec.title}</h4>
+                            <span class="text-[10px] font-mono text-slate-400">${extractYouTubeId(lec.videoUrl) ? 'YouTube Lecture' : 'HD Video Stream'}</span>
+                        </div>
+                    </div>
+                    <span class="font-mono text-[11px] text-slate-300 shrink-0">${lec.duration || '45:00'}</span>
+                </div>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function backToLectures() {
+            appState.selectedLectureId = null;
+            stopVideoPlayback();
+            document.getElementById('level-player').classList.add('hidden');
+            document.getElementById('level-lectures').classList.remove('hidden');
+            renderLecturesView();
+        }
+
+        // LEVEL 4: Video Lecture Study Player
+        function extractYouTubeId(url) {
+            if (!url) return null;
+            const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+            const match = url.match(regExp);
+            return match ? match[1] : null;
+        }
+
+        function stopVideoPlayback() {
+            const vid = document.getElementById('native-video-player');
+            const ifr = document.getElementById('iframe-video-player');
+            if (vid) {
+                vid.pause();
+                vid.removeAttribute('src');
+                vid.load();
+                vid.classList.add('hidden');
+            }
+            if (ifr) {
+                ifr.src = 'about:blank';
+                ifr.classList.add('hidden');
+            }
+            const ytCard = document.getElementById('yt-player-card');
+            if (ytCard) ytCard.classList.add('hidden');
+            const toolbar = document.getElementById('native-study-toolbar');
+            if (toolbar) toolbar.classList.add('hidden');
+        }
+
+        function playVideoLecture(lectureId) {
+            const course = appState.courses.find(c => c.id === appState.selectedCourseId);
+            const chapter = course ? (course.chapters || []).find(ch => ch.id === appState.selectedChapterId) : null;
+            const lectures = chapter ? (chapter.lectures || []) : [];
+            const idx = lectures.findIndex(l => l.id === lectureId);
+            const lecture = lectures[idx];
+            if (!lecture) return;
+
+            appState.selectedLectureId = lectureId;
+            document.getElementById('level-lectures').classList.add('hidden');
+            document.getElementById('level-player').classList.remove('hidden');
+
+            document.getElementById('player-chapter-label').textContent = chapter.title;
+            const subj = chapter.subject || 'Biology';
+            const subjBadge = document.getElementById('player-subject-badge');
+            subjBadge.textContent = subj;
+            subjBadge.className = `px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 ${getSubjectBadgeClass(subj)}`;
+            document.getElementById('player-lecture-title').textContent = lecture.title;
+
+            document.getElementById('btn-prev-lecture').disabled = idx <= 0;
+            document.getElementById('btn-next-lecture').disabled = idx >= lectures.length - 1;
+
+            updateDoneButtonUI();
+            renderLectureNotes();
+            renderPlayerPlaylist();
+
+            stopVideoPlayback();
+
+            const ytId = extractYouTubeId(lecture.videoUrl);
+            currentYouTubeId = ytId;
+
+            if (ytId) {
+                const proto = window.location.protocol;
+                const isRestrictedOrigin = (
+                    proto === 'content:' ||
+                    proto === 'file:' ||
+                    proto === 'about:' ||
+                    window.location.origin === 'null' ||
+                    window.self !== window.top
+                );
+                const ytCard = document.getElementById('yt-player-card');
+                const extLink = document.getElementById('yt-external-link');
+                const thumb = document.getElementById('yt-thumb-bg');
+                document.getElementById('yt-card-title').textContent = lecture.title;
+                extLink.href = `https://www.youtube.com/watch?v=${ytId}`;
+                thumb.src = `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`;
+
+                if (isRestrictedOrigin) {
+                    ytCard.classList.remove('hidden');
+                } else {
+                    forceLoadYouTubeEmbed();
+                }
+            } else {
+                const vid = document.getElementById('native-video-player');
+                const toolbar = document.getElementById('native-study-toolbar');
+                vid.src = lecture.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+                vid.classList.remove('hidden');
+                toolbar.classList.remove('hidden');
+                setPlaybackSpeed(1);
+                vid.play().catch(() => {});
+            }
+            lucide.createIcons();
+        }
+
+        function forceLoadYouTubeEmbed() {
+            if (!currentYouTubeId) return;
+            document.getElementById('yt-player-card').classList.add('hidden');
+            const ifr = document.getElementById('iframe-video-player');
+            const originParam = (window.location.origin && window.location.origin !== 'null' && window.location.protocol.startsWith('http'))
+                ? `&origin=${encodeURIComponent(window.location.origin)}`
+                : '';
+            ifr.src = `https://www.youtube.com/embed/${currentYouTubeId}?rel=0&modestbranding=1&playsinline=1${originParam}`;
+            ifr.classList.remove('hidden');
+        }
+
+        function seekVideo(seconds) {
+            const vid = document.getElementById('native-video-player');
+            if (!vid || vid.classList.contains('hidden')) return;
+            vid.currentTime = Math.max(0, Math.min(vid.duration || 0, vid.currentTime + seconds));
+        }
+
+        function setPlaybackSpeed(rate) {
+            const vid = document.getElementById('native-video-player');
+            if (vid) vid.playbackRate = rate;
+            document.querySelectorAll('.speed-pill').forEach(btn => {
+                const active = parseFloat(btn.getAttribute('data-speed')) === rate;
+                btn.className = active
+                    ? 'speed-pill px-1.5 py-0.5 rounded text-[10px] font-mono bg-indigo-500 text-white'
+                    : 'speed-pill px-1.5 py-0.5 rounded text-[10px] font-mono bg-obsidian text-slate-400 border border-white/10';
+            });
+        }
+
+        function toggleVideoPip() {
+            const vid = document.getElementById('native-video-player');
+            if (!vid || vid.classList.contains('hidden')) return;
+            if (document.pictureInPictureElement) {
+                document.exitPictureInPicture().catch(() => {});
+            } else if (vid.requestPictureInPicture) {
+                vid.requestPictureInPicture().catch(() => showToast('PiP unavailable on this browser', true));
+            }
+        }
+
+        function toggleVideoFullscreen() {
+            const stage = document.getElementById('video-stage');
+            if (!document.fullscreenElement) {
+                stage.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
+        }
+
+        function toggleCurrentLectureComplete() {
+            const id = appState.selectedLectureId;
+            if (!id) return;
+            const idx = appState.completedLectures.indexOf(id);
+            if (idx === -1) {
+                appState.completedLectures.push(id);
+                showToast('Lecture marked completed');
+            } else {
+                appState.completedLectures.splice(idx, 1);
+            }
+            updateDoneButtonUI();
+            renderPlayerPlaylist();
+            saveState();
+        }
+
+        function updateDoneButtonUI() {
+            const btn = document.getElementById('btn-mark-lecture-done');
+            const isDone = appState.completedLectures.includes(appState.selectedLectureId);
+            btn.className = isDone
+                ? 'px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 text-[11px] font-bold flex items-center gap-1'
+                : 'px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold flex items-center gap-1';
+        }
+
+        function navigateLecture(delta) {
+            const course = appState.courses.find(c => c.id === appState.selectedCourseId);
+            const chapter = course ? (course.chapters || []).find(ch => ch.id === appState.selectedChapterId) : null;
+            const lectures = chapter ? (chapter.lectures || []) : [];
+            const idx = lectures.findIndex(l => l.id === appState.selectedLectureId);
+            const nextIdx = idx + delta;
+            if (nextIdx >= 0 && nextIdx < lectures.length) {
+                playVideoLecture(lectures[nextIdx].id);
+            }
+        }
+
+        function addTimestampedNote() {
+            const input = document.getElementById('lecture-note-input');
+            const text = input.value.trim();
+            if (!text || !appState.selectedLectureId) return;
+            const vid = document.getElementById('native-video-player');
+            const secs = vid && !vid.classList.contains('hidden') ? Math.floor(vid.currentTime) : 0;
+            const mins = String(Math.floor(secs / 60)).padStart(2, '0');
+            const rem = String(secs % 60).padStart(2, '0');
+
+            if (!appState.lectureNotes[appState.selectedLectureId]) {
+                appState.lectureNotes[appState.selectedLectureId] = [];
+            }
+            appState.lectureNotes[appState.selectedLectureId].unshift({
+                time: `${mins}:${rem}`,
+                text
+            });
+            input.value = '';
+            renderLectureNotes();
+            saveState();
+        }
+
+        function renderLectureNotes() {
+            const list = document.getElementById('lecture-notes-list');
+            const items = appState.lectureNotes[appState.selectedLectureId] || [];
+            if (!items.length) {
+                list.innerHTML = `<p class="text-[11px] text-slate-500">No notes stamped for this lecture yet.</p>`;
+                return;
+            }
+            list.innerHTML = items.map(n => `
+                <div class="flex items-start gap-2 bg-obsidian border border-white/5 rounded-lg px-2.5 py-1.5 text-xs">
+                    <span class="font-mono text-[10px] text-cyan-400 shrink-0 mt-0.5">${n.time}</span>
+                    <span class="text-slate-200 break-words">${n.text}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderPlayerPlaylist() {
+            const course = appState.courses.find(c => c.id === appState.selectedCourseId);
+            const chapter = course ? (course.chapters || []).find(ch => ch.id === appState.selectedChapterId) : null;
+            if (!chapter) return;
+
+            const lectures = chapter.lectures || [];
+            const done = lectures.filter(l => appState.completedLectures.includes(l.id)).length;
+            document.getElementById('player-playlist-chapter').textContent = chapter.title;
+            document.getElementById('player-playlist-count').textContent = `${done}/${lectures.length}`;
+
+            const container = document.getElementById('player-playlist-items');
+            container.innerHTML = lectures.map((lec, i) => {
+                const active = lec.id === appState.selectedLectureId;
+                const isDone = appState.completedLectures.includes(lec.id);
+                return `
+                <div onclick="playVideoLecture('${lec.id}')" class="cursor-pointer flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-xs ${active ? 'bg-indigo-500/20 border-indigo-500/40 text-white' : 'bg-obsidian border-white/5 text-slate-300 hover:bg-white/5'}">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="w-4 h-4 rounded text-[10px] font-mono flex items-center justify-center shrink-0 ${isDone ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-white/10 text-slate-300'}">${i + 1}</span>
+                        <span class="truncate">${lec.title}</span>
+                    </div>
+                    <span class="font-mono text-[10px] text-slate-400 shrink-0">${lec.duration || '45:00'}</span>
+                </div>`;
+            }).join('');
+        }
+
+        // TAB 2: Practice Quiz Engine (+4 / -1 / 0)
+        function getFilteredQuizzes() {
+            if (appState.subjectFilter === 'All') return appState.quizzes;
+            return appState.quizzes.filter(q => q.subject === appState.subjectFilter);
+        }
+
+        function renderQuiz() {
+            const list = getFilteredQuizzes();
+            const emptyEl = document.getElementById('quiz-empty-state');
+            const boxEl = document.getElementById('quiz-active-box');
+
+            if (!list.length) {
+                emptyEl.classList.remove('hidden');
+                boxEl.classList.add('hidden');
+                return;
+            }
+            emptyEl.classList.add('hidden');
+            boxEl.classList.remove('hidden');
+
+            if (appState.quizIndex >= list.length) appState.quizIndex = 0;
+            const q = list[appState.quizIndex];
+            document.getElementById('quiz-q-counter').textContent = `Q ${appState.quizIndex + 1} / ${list.length}`;
+            const badge = document.getElementById('quiz-subject-badge');
+            badge.textContent = q.subject;
+            badge.className = `px-2 py-0.5 rounded-full text-[10px] font-semibold border ${getSubjectBadgeClass(q.subject)}`;
+            document.getElementById('quiz-question-text').textContent = q.question;
+
+            const chosen = appState.quizAnswers[q.id];
+            const optsEl = document.getElementById('quiz-options-container');
+            optsEl.innerHTML = q.options.map((opt, idx) => {
+                let cls = 'bg-obsidian border-white/10 text-slate-200 hover:border-indigo-500/40';
+                if (chosen !== undefined) {
+                    if (idx === q.correctIndex) cls = 'bg-emerald-500/20 border-emerald-500 text-emerald-200';
+                    else if (idx === chosen) cls = 'bg-rose-500/20 border-rose-500 text-rose-200';
+                }
+                return `<button onclick="selectQuizOption('${q.id}', ${idx})" class="w-full text-left px-3 py-2 rounded-lg border text-xs transition-all flex items-center gap-2 ${cls}">
+                    <span class="font-mono font-bold text-slate-400">${String.fromCharCode(65 + idx)}.</span>
+                    <span>${opt}</span>
+                </button>`;
+            }).join('');
+
+            const expEl = document.getElementById('quiz-explanation-box');
+            if (chosen !== undefined && q.explanation) {
+                expEl.textContent = `NCERT Explanation: ${q.explanation}`;
+                expEl.classList.remove('hidden');
+            } else {
+                expEl.classList.add('hidden');
+            }
+
+            updateQuizScore();
+        }
+
+        function selectQuizOption(qId, optIdx) {
+            if (appState.quizAnswers[qId] !== undefined) return;
+            appState.quizAnswers[qId] = optIdx;
+            renderQuiz();
+            saveState();
+        }
+
+        function updateQuizScore() {
+            let score = 0;
+            appState.quizzes.forEach(q => {
+                const ans = appState.quizAnswers[q.id];
+                if (ans !== undefined) {
+                    score += (ans === q.correctIndex) ? 4 : -1;
+                }
+            });
+            document.getElementById('quiz-live-score').textContent = score;
+            if (Object.keys(appState.quizAnswers).length > 0) {
+                if (appState.bestQuizScore === null || score > appState.bestQuizScore) {
+                    appState.bestQuizScore = score;
+                }
+            }
+            const bestEl = document.getElementById('stat-best-score');
+            if (bestEl) bestEl.textContent = appState.bestQuizScore !== null ? appState.bestQuizScore : '--';
+        }
+
+        function moveQuizQuestion(delta) {
+            const list = getFilteredQuizzes();
+            if (!list.length) return;
+            appState.quizIndex = (appState.quizIndex + delta + list.length) % list.length;
+            renderQuiz();
+        }
+
+        function restartQuiz() {
+            appState.quizAnswers = {};
+            appState.quizIndex = 0;
+            renderQuiz();
+            saveState();
+            showToast('Quiz reset');
+        }
+
+        // TAB 3: Study Notes
+        function toggleBookmarksFilter() {
+            appState.bookmarksOnly = !appState.bookmarksOnly;
+            const btn = document.getElementById('btn-toggle-bookmarks');
+            btn.className = appState.bookmarksOnly
+                ? 'px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 font-semibold text-[11px] shrink-0'
+                : 'px-2.5 py-1 rounded-lg bg-obsidian border border-white/10 text-[11px] text-slate-300 shrink-0';
+            renderNotes();
+        }
+
+        function toggleBookmarkNote(noteId) {
+            const idx = appState.bookmarkedNotes.indexOf(noteId);
+            if (idx === -1) appState.bookmarkedNotes.push(noteId);
+            else appState.bookmarkedNotes.splice(idx, 1);
+            updateBookmarkBadge();
+            renderNotes();
+            saveState();
+        }
+
+        function updateBookmarkBadge() {
+            const badge = document.getElementById('nav-bookmark-badge');
+            if (!badge) return;
+            const count = appState.bookmarkedNotes.length;
+            badge.textContent = count;
+            badge.classList.toggle('hidden', count === 0);
+        }
+
+        function renderNotes() {
+            const grid = document.getElementById('notes-grid');
+            const query = (document.getElementById('notes-search-input').value || '').toLowerCase();
+            let list = appState.notes;
+
+            if (appState.subjectFilter !== 'All') {
+                list = list.filter(n => n.subject === appState.subjectFilter);
+            }
+            if (appState.bookmarksOnly) {
+                list = list.filter(n => appState.bookmarkedNotes.includes(n.id));
+            }
+            if (query) {
+                list = list.filter(n => n.title.toLowerCase().includes(query) || n.content.toLowerCase().includes(query));
+            }
+
+            if (!list.length) {
+                grid.innerHTML = `<div class="col-span-full bg-surface border border-white/10 rounded-xl p-4 text-center text-xs text-slate-400">No study notes matching filter.</div>`;
+                return;
+            }
+
+            grid.innerHTML = list.map(note => {
+                const saved = appState.bookmarkedNotes.includes(note.id);
+                return `
+                <div class="bg-surface border border-white/10 rounded-xl p-3 space-y-1.5">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${getSubjectBadgeClass(note.subject)}">${note.subject}</span>
+                        <button onclick="toggleBookmarkNote('${note.id}')" class="text-xs ${saved ? 'text-amber-400' : 'text-slate-500 hover:text-slate-300'}">
+                            <i data-lucide="bookmark" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                    <h4 class="text-xs sm:text-sm font-bold text-white">${note.title}</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">${note.content}</p>
+                </div>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        // TAB 4: Admin Dashboard & GitHub CMS (Amit21686/NAV.Education)
+        function saveAdminPat() {
+            const val = document.getElementById('admin-pat-input').value.trim();
+            if (!val) return showToast('Enter a valid GitHub PAT', true);
+            localStorage.setItem('nav_edu_gh_pat', val);
+            updatePatStatusBadge(true);
+            showToast('GitHub PAT saved locally');
+        }
+
+        function updatePatStatusBadge(hasPat) {
+            const badge = document.getElementById('pat-status-badge');
+            if (!badge) return;
+            if (hasPat) {
+                badge.textContent = 'PAT Saved';
+                badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap shrink-0';
+            } else {
+                badge.textContent = 'PAT Needed';
+                badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30 whitespace-nowrap shrink-0';
+            }
+        }
+
+        function populateAdminSelectors() {
+            const courseSel = document.getElementById('adm-lec-course');
+            if (!courseSel) return;
+            if (!appState.courses.length) {
+                courseSel.innerHTML = `<option value="">No courses yet</option>`;
+            } else {
+                courseSel.innerHTML = appState.courses.map(c => `<option value="${c.id}">${c.title}</option>`).join('');
+            }
+            populateAdminChapterDropdown();
+        }
+
+        function populateAdminChapterDropdown() {
+            const courseId = document.getElementById('adm-lec-course').value;
+            const subj = document.getElementById('adm-lec-subject').value;
+            const chSelect = document.getElementById('adm-lec-chapter-select');
+            const course = appState.courses.find(c => c.id === courseId);
+
+            let options = `<option value="__NEW__">+ Create New Chapter...</option>`;
+            if (course && course.chapters) {
+                const matching = course.chapters.filter(ch => (ch.subject || 'Biology') === subj);
+                matching.forEach(ch => {
+                    const count = ch.lectures ? ch.lectures.length : 0;
+                    options += `<option value="${ch.id}">${ch.title} (${count} lectures)</option>`;
+                });
+            }
+            chSelect.innerHTML = options;
+            handleAdminChapterSelectChange();
+        }
+
+        function handleAdminChapterSelectChange() {
+            const val = document.getElementById('adm-lec-chapter-select').value;
+            const newInput = document.getElementById('adm-lec-chapter');
+            if (val === '__NEW__') {
+                newInput.classList.remove('hidden');
+            } else {
+                newInput.classList.add('hidden');
+            }
+        }
+
+        function adminAddCourse() {
+            const title = document.getElementById('adm-course-title').value.trim();
+            const desc = document.getElementById('adm-course-desc').value.trim();
+            if (!title) return showToast('Enter course title', true);
+
+            appState.courses.push({
+                id: 'course-' + Date.now(),
+                title,
+                description: desc || 'Comprehensive NEET Biology, Physics & Chemistry batch.',
+                chapters: []
+            });
+            document.getElementById('adm-course-title').value = '';
+            document.getElementById('adm-course-desc').value = '';
+            populateAdminSelectors();
+            renderCourses();
+            saveState();
+            showToast('NEET Course added — click Push Data');
+        }
+
+        function adminAddLecture() {
+            const courseId = document.getElementById('adm-lec-course').value;
+            const subject = document.getElementById('adm-lec-subject').value;
+            const selectedChId = document.getElementById('adm-lec-chapter-select').value;
+            const newChTitle = document.getElementById('adm-lec-chapter').value.trim();
+            const lecTitle = document.getElementById('adm-lec-title').value.trim();
+            const duration = document.getElementById('adm-lec-duration').value.trim() || '45:00';
+            const videoUrl = document.getElementById('adm-lec-url').value.trim();
+
+            const course = appState.courses.find(c => c.id === courseId);
+            if (!course) return showToast('Create or select a course first', true);
+            if (!lecTitle || !videoUrl) return showToast('Enter lecture title and video URL', true);
+
+            let chapter = null;
+            if (selectedChId === '__NEW__') {
+                if (!newChTitle) return showToast('Enter new chapter name', true);
+                chapter = {
+                    id: 'ch-' + Date.now(),
+                    subject,
+                    title: newChTitle,
+                    lectures: []
+                };
+                course.chapters.push(chapter);
+            } else {
+                chapter = (course.chapters || []).find(ch => ch.id === selectedChId);
+                if (!chapter) return showToast('Selected chapter not found', true);
+            }
+
+            chapter.lectures.push({
+                id: 'lec-' + Date.now(),
+                title: lecTitle,
+                duration,
+                videoUrl
+            });
+
+            document.getElementById('adm-lec-chapter').value = '';
+            document.getElementById('adm-lec-title').value = '';
+            document.getElementById('adm-lec-url').value = '';
+            populateAdminChapterDropdown();
+            renderCourses();
+            saveState();
+            showToast('Lecture added — click Push Data');
+        }
+
+        function adminAddNote() {
+            const subject = document.getElementById('adm-note-subject').value;
+            const title = document.getElementById('adm-note-title').value.trim();
+            const content = document.getElementById('adm-note-content').value.trim();
+            if (!title || !content) return showToast('Enter note title and content', true);
+
+            appState.notes.unshift({
+                id: 'note-' + Date.now(),
+                subject,
+                title,
+                content
+            });
+            document.getElementById('adm-note-title').value = '';
+            document.getElementById('adm-note-content').value = '';
+            saveState();
+            showToast('Study note added — click Push Data');
+        }
+
+        function adminAddQuestion() {
+            const subject = document.getElementById('adm-q-subject').value;
+            const question = document.getElementById('adm-q-text').value.trim();
+            const opts = [
+                document.getElementById('adm-q-opt0').value.trim(),
+                document.getElementById('adm-q-opt1').value.trim(),
+                document.getElementById('adm-q-opt2').value.trim(),
+                document.getElementById('adm-q-opt3').value.trim()
+            ];
+            const correctIndex = parseInt(document.getElementById('adm-q-correct').value, 10);
+            const explanation = document.getElementById('adm-q-exp').value.trim();
+
+            if (!question || opts.some(o => !o)) return showToast('Fill question and all 4 options', true);
+
+            appState.quizzes.push({
+                id: 'q-' + Date.now(),
+                subject,
+                question,
+                options: opts,
+                correctIndex,
+                explanation
+            });
+            document.getElementById('adm-q-text').value = '';
+            ['adm-q-opt0', 'adm-q-opt1', 'adm-q-opt2', 'adm-q-opt3', 'adm-q-exp'].forEach(id => document.getElementById(id).value = '');
+            saveState();
+            showToast('NEET MCQ added — click Push Data');
+        }
+
+        // Load Compact NEET Starter Curriculum
+        function loadStarterTemplate() {
+            appState.courses = [
+                {
+                    id: 'neet-lakshya-2027',
+                    title: 'NEET 2027 Complete NCERT Mastery',
+                    description: 'Full Class 11 & 12 Biology, Physics, and Chemistry video lectures + NCERT line-by-line coverage.',
+                    chapters: [
+                        {
+                            id: 'ch-bio-repro',
+                            subject: 'Biology',
+                            title: 'Sexual Reproduction in Flowering Plants',
+                            lectures: [
+                                { id: 'lec-bio-1', title: 'Pre-Fertilisation: Structure & Events', duration: '42:15', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4' },
+                                { id: 'lec-bio-2', title: 'Double Fertilisation & Post-Fertilisation', duration: '38:50', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4' }
+                            ]
+                        },
+                        {
+                            id: 'ch-phy-electro',
+                            subject: 'Physics',
+                            title: 'Electric Charges and Fields',
+                            lectures: [
+                                { id: 'lec-phy-1', title: 'Coulomb Law & Superposition Principle', duration: '51:10', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4' }
+                            ]
+                        },
+                        {
+                            id: 'ch-chem-sol',
+                            subject: 'Chemistry',
+                            title: 'Solutions & Colligative Properties',
+                            lectures: [
+                                { id: 'lec-chem-1', title: 'Raoult Law & Ideal vs Non-Ideal Solutions', duration: '44:20', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4' }
+                            ]
+                        }
+                    ]
+                }
+            ];
+
+            appState.notes = [
+                { id: 'n-bio-1', subject: 'Biology', title: 'Tapetum & Sporopollenin Facts', content: 'Cells of tapetum possess dense cytoplasm and generally have more than one nucleus. Exine is made of sporopollenin — the most resistant organic material known.' },
+                { id: 'n-phy-1', subject: 'Physics', title: 'Gauss Law Key Result', content: 'Electric flux through a closed surface depends only on the net charge enclosed (q_in / ε₀) and is independent of shape or size.' },
+                { id: 'n-chem-1', subject: 'Chemistry', title: 'Azeotropes Summary', content: 'Minimum boiling azeotropes show large positive deviation from Raoult law (e.g., Ethanol + Water).' }
+            ];
+
+            appState.quizzes = [
+                {
+                    id: 'q-neet-1',
+                    subject: 'Biology',
+                    question: 'Which layer of the microsporangium nourishes the developing pollen grains and has polyploid cells?',
+                    options: ['Epidermis', 'Endothecium', 'Middle layers', 'Tapetum'],
+                    correctIndex: 3,
+                    explanation: 'Tapetum is the innermost wall layer of the microsporangium; its cells have dense cytoplasm and become multinucleate/polyploid.'
+                },
+                {
+                    id: 'q-neet-2',
+                    subject: 'Physics',
+                    question: 'If the distance between two point charges is doubled and each charge is also doubled, the electrostatic force between them:',
+                    options: ['Remains unchanged', 'Becomes double', 'Becomes half', 'Becomes four times'],
+                    correctIndex: 0,
+                    explanation: 'F = k(2q1)(2q2) / (2r)² = 4kq1q2 / 4r² = F (remains unchanged).'
+                }
+            ];
+
+            populateAdminSelectors();
+            renderAll();
+            saveState();
+            showToast('NEET Starter Template loaded! Click Push Data to publish.');
+        }
+
+        // Fetch Live JSON from GitHub Repository
+        async function syncFromBuiltInGithub(silent = false) {
+            const logEl = document.getElementById('admin-sync-log');
+            if (logEl) logEl.textContent = 'Fetching live data from Amit21686/NAV.Education...';
+
+            const baseRaw = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/data`;
+            const ts = Date.now();
+            try {
+                const [cRes, nRes, qRes] = await Promise.all([
+                    fetch(`${baseRaw}/courses.json?t=${ts}`),
+                    fetch(`${baseRaw}/notes.json?t=${ts}`),
+                    fetch(`${baseRaw}/quizzes.json?t=${ts}`)
+                ]);
+
+                let updated = false;
+                if (cRes.ok) { appState.courses = await cRes.json(); updated = true; }
+                if (nRes.ok) { appState.notes = await nRes.json(); updated = true; }
+                if (qRes.ok) { appState.quizzes = await qRes.json(); updated = true; }
+
+                if (updated) {
+                    saveState();
+                    populateAdminSelectors();
+                    renderAll();
+                    if (logEl) logEl.textContent = `Synced live from Amit21686/NAV.Education (${appState.courses.length} courses).`;
+                    if (!silent) showToast('Fetched latest content from GitHub');
+                } else {
+                    if (logEl) logEl.textContent = 'Repo data/ files not initialized yet — add items or click Push Data.';
+                    if (!silent) showToast('No data/ files found in repo yet', true);
+                }
+            } catch (err) {
+                if (logEl) logEl.textContent = 'Offline or network error fetching GitHub repo.';
+                if (!silent) showToast('Failed to reach GitHub', true);
+            }
+        }
+
+        // Push Raw Text/HTML File to Amit21686/NAV.Education via GitHub Contents API
+        async function pushRawTextToGithub(path, textContent, commitMessage, pat) {
+            const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
+            let sha = null;
+
+            const getRes = await fetch(`${apiUrl}?ref=${GITHUB_CONFIG.branch}`, {
+                headers: {
+                    'Authorization': `Bearer ${pat}`,
+                    'Accept': 'application/vnd.github+json'
+                }
+            });
+            if (getRes.ok) {
+                const existing = await getRes.json();
+                sha = existing.sha;
+            }
+
+            const base64Content = btoa(unescape(encodeURIComponent(textContent)));
+            const body = {
+                message: commitMessage,
+                content: base64Content,
+                branch: GITHUB_CONFIG.branch
+            };
+            if (sha) body.sha = sha;
+
+            const putRes = await fetch(apiUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${pat}`,
+                    'Accept': 'application/vnd.github+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (!putRes.ok) {
+                const errData = await putRes.json().catch(() => ({}));
+                throw new Error(errData.message || `GitHub HTTP ${putRes.status}`);
+            }
+        }
+
+        // Push JSON Files to Amit21686/NAV.Education via GitHub Contents API
+        async function pushFileToGithub(path, jsonObj, pat) {
+            return pushRawTextToGithub(
+                path,
+                JSON.stringify(jsonObj, null, 2),
+                `Update ${path} via NAV Education Admin`,
+                pat
+            );
+        }
+
+        // Push All JSON Curriculum Data to GitHub
+        async function pushAllToBuiltInGithub() {
+            let pat = localStorage.getItem('nav_edu_gh_pat') || document.getElementById('admin-pat-input').value.trim();
+            if (!pat) {
+                document.getElementById('admin-pat-input').focus();
+                return showToast('Paste your GitHub PAT above first', true);
+            }
+            localStorage.setItem('nav_edu_gh_pat', pat);
+            updatePatStatusBadge(true);
+
+            const btn = document.getElementById('btn-push-github');
+            const logEl = document.getElementById('admin-sync-log');
+            btn.disabled = true;
+            if (logEl) logEl.textContent = 'Pushing courses.json, notes.json & quizzes.json to GitHub...';
+
+            try {
+                await pushFileToGithub('data/courses.json', appState.courses, pat);
+                await pushFileToGithub('data/notes.json', appState.notes, pat);
+                await pushFileToGithub('data/quizzes.json', appState.quizzes, pat);
+                if (logEl) logEl.textContent = `Published all curriculum data to Amit21686/NAV.Education!`;
+                showToast('All data pushed to GitHub!');
+            } catch (err) {
+                if (logEl) logEl.textContent = `Push failed: ${err.message}`;
+                showToast(`GitHub Error: ${err.message}`, true);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Serialize and Deploy Self-Contained index.html to Amit21686/NAV.Education
+        async function deployAppHtmlToGithub() {
+            let pat = localStorage.getItem('nav_edu_gh_pat') || document.getElementById('admin-pat-input').value.trim();
+            if (!pat) {
+                document.getElementById('admin-pat-input').focus();
+                return showToast('Paste your GitHub PAT above first', true);
+            }
+            localStorage.setItem('nav_edu_gh_pat', pat);
+            updatePatStatusBadge(true);
+
+            const btn = document.getElementById('btn-deploy-app');
+            const logEl = document.getElementById('admin-sync-log');
+            btn.disabled = true;
+            if (logEl) logEl.textContent = 'Deploying index.html to Amit21686/NAV.Education...';
+
+            try {
+                const clone = document.documentElement.cloneNode(true);
+                const patField = clone.querySelector('#admin-pat-input');
+                if (patField) patField.setAttribute('value', '');
+                const toastEl = clone.querySelector('#toast-box');
+                if (toastEl) toastEl.classList.add('hidden');
+                const menuEl = clone.querySelector('#hamburger-menu');
+                if (menuEl) menuEl.classList.add('hidden');
+
+                const fullHtml = '<!DOCTYPE html>\n' + clone.outerHTML;
+                await pushRawTextToGithub('index.html', fullHtml, 'Deploy NAV Education app via Admin Dashboard', pat);
+
+                if (logEl) {
+                    logEl.innerHTML = `Deployed <strong class="text-emerald-400">index.html</strong>! Enable GitHub Pages (main / root) and open <a href="https://amit21686.github.io/NAV.Education/" target="_blank" class="underline text-cyan-300">amit21686.github.io/NAV.Education</a>.`;
+                }
+                showToast('index.html deployed to GitHub!');
+            } catch (err) {
+                if (logEl) logEl.textContent = `Deploy failed: ${err.message}`;
+                showToast(`Deploy Error: ${err.message}`, true);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Reset Modal
+        function openResetModal() { document.getElementById('reset-modal').classList.remove('hidden'); }
+        function closeResetModal() { document.getElementById('reset-modal').classList.add('hidden'); }
+        function confirmResetProgress() {
+            appState.completedLectures = [];
+            appState.lectureNotes = {};
+            appState.bookmarkedNotes = [];
+            appState.quizAnswers = {};
+            appState.bestQuizScore = null;
+            saveState();
+            closeResetModal();
+            renderAll();
+            showToast('Local progress cleared');
+        }
+
+        function renderAll() {
+            renderCourses();
+            updateBookmarkBadge();
+            updateQuizScore();
+            if (appState.activeTab === 'quizzes') renderQuiz();
+            if (appState.activeTab === 'notes') renderNotes();
+        }
+
+        function initApp() {
+            const saved = localStorage.getItem('nav_edu_state_v5');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    appState = { ...appState, ...parsed };
+                } catch (e) {}
+            }
+            const pat = localStorage.getItem('nav_edu_gh_pat');
+            if (pat) {
+                const patInput = document.getElementById('admin-pat-input');
+                if (patInput) patInput.value = pat;
+                updatePatStatusBadge(true);
+            }
+            lucide.createIcons();
+            renderAll();
+            syncFromBuiltInGithub(true);
+        }
+
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+
+</body></html>
